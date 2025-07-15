@@ -1,15 +1,35 @@
-1. Descargar dependencias
+<div align="center">
+Chronocode backend implementation in golang with worker pools for commit downloading, concurrent AI processing and database pushing.
+</div>
+
+## Frontend example
+![Demo](assets/Demo.png)
+
+## ENV file setup
+```env
+GEMINI_API_KEY=
+SUPABASE_URL=
+SUPABASE_KEY=
+```
+
+## Dependency installation
 ```bash
 go mod tidy
 ```
-2. Poner la api key de gemini
-3. Poner URL de supabase
-4. Poner api key de supabase
-5. Correr server
+
+## Run server
 ```bash
-go run cmd/chronocode/main.go
+go run cmd/chronocode/server.go
 ```
-6. Correr testeo de performance (tiempos de database y del agente hardcodeados)
-```bash
-go run performance/main.go
+
+## Example
+
 ```
+http://localhost:8080/analyze-repository?repo_url=https://github.com/octokerbs/50Cent-Dolar-Blue-Bot&access_token=YourGithubApiToken
+```
+
+## Notes
+- Google gives free gemini api keys for testing here [Google AI Studio](https://aistudio.google.com/app/apikey).
+- The performance directory is just for testing the speed of the workers pool.
+- The frontend is not currently available. 
+- We use supabase to store commits and not re-analyze them when a repo is asked to again.
