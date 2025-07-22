@@ -1,5 +1,7 @@
 <div align="center">
-Chronocode backend implementation in golang with worker pools for commit downloading, concurrent AI processing and database pushing.
+  
+# 📅 Chronocode 
+An intelligent GitHub repo analyzer that summarizes and categorizes commits using Gemini, GitHub API, and Supabase. This iteration is implemented in golang with worker pools for commit downloading, concurrent AI processing and database pushing.
 </div>
 
 ## Frontend example
