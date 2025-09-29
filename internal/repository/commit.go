@@ -1,12 +1,12 @@
-package database
+package repository
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/chrono-code-hackathon/chronocode-go/internal/agent"
-	"github.com/chrono-code-hackathon/chronocode-go/internal/sourcecodehost"
+	"github.com/octokerbs/chronocode-go/internal/domain/agent"
+	"github.com/octokerbs/chronocode-go/internal/domain/sourcecodehost"
 )
 
 type CommitRecord struct {
@@ -17,7 +17,7 @@ type CommitRecord struct {
 	Message     string     `json:"message"`              // Completed manually via API data
 	URL         string     `json:"url"`                  // Completed manually via API data
 	AuthorEmail string     `json:"author_email"`         // Completed manually via API data
-	Description string     `json:"description"`          // Comleted by code analysis
+	Description string     `json:"description"`          // Completed by code analysis
 	AuthorURL   string     `json:"author_url"`           // Completed manually via API data
 	Files       []string   `json:"files"`                // Completed manually via API data
 	RepoID      int64      `json:"repo_id"`              // Completed manually via API data

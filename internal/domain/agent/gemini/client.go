@@ -24,10 +24,6 @@ func NewGeminiGenerativeService(ctx context.Context, key string) (*GeminiGenerat
 	return &GeminiGenerativeService{geminiService: geminiService, model: model}, nil
 }
 
-func (g *GeminiGenerativeService) Close() {
-	g.geminiService.Close()
-}
-
 func (g *GeminiGenerativeService) Generate(ctx context.Context, prompt string) ([]byte, error) {
 	resp, err := g.model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
@@ -41,4 +37,8 @@ func (g *GeminiGenerativeService) Generate(ctx context.Context, prompt string) (
 	}
 
 	return nil, fmt.Errorf("no text response parts found for commit")
+}
+
+func (g *GeminiGenerativeService) Close() {
+	g.geminiService.Close()
 }

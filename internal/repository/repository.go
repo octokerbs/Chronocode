@@ -1,11 +1,11 @@
-package database
+package repository
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/chrono-code-hackathon/chronocode-go/internal/sourcecodehost"
+	"github.com/octokerbs/chronocode-go/internal/domain/sourcecodehost"
 )
 
 type RepositoryRecord struct {

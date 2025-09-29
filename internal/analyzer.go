@@ -5,22 +5,22 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/chrono-code-hackathon/chronocode-go/internal/agent"
-	"github.com/chrono-code-hackathon/chronocode-go/internal/database"
-	"github.com/chrono-code-hackathon/chronocode-go/internal/sourcecodehost"
+	"github.com/octokerbs/chronocode-go/internal/domain/agent"
+	"github.com/octokerbs/chronocode-go/internal/domain/sourcecodehost"
+	"github.com/octokerbs/chronocode-go/internal/repository"
 )
 
 type RepositoryAnalyzer struct {
 	GenerativeAgentService agent.GenerativeAgentService
 	SourceCodeHostService  sourcecodehost.SourcecodeHostService
-	DatabaseService        database.DatabaseService
-	RepositoryRecord       *database.RepositoryRecord
+	DatabaseService        repository.DatabaseService
+	RepositoryRecord       *repository.RepositoryRecord
 
-	AnalyzedCommits      []database.CommitRecord
+	AnalyzedCommits      []repository.CommitRecord
 	analyzedCommitsMutex sync.Mutex
 }
 
-func NewRepositoryAnalyzer(ctx context.Context, generativeAgentService agent.GenerativeAgentService, sourceCodeHostService sourcecodehost.SourcecodeHostService, databaseService database.DatabaseService) (*RepositoryAnalyzer, error) {
+func NewRepositoryAnalyzer(ctx context.Context, generativeAgentService agent.GenerativeAgentService, sourceCodeHostService sourcecodehost.SourcecodeHostService, databaseService repository.DatabaseService) (*RepositoryAnalyzer, error) {
 	repositoryRecord, err := getOrCreateRepositoryRecord(ctx, databaseService, sourceCodeHostService, sourceCodeHostService.RepositoryID())
 	if err != nil {
 		return nil, err
@@ -31,13 +31,13 @@ func NewRepositoryAnalyzer(ctx context.Context, generativeAgentService agent.Gen
 		SourceCodeHostService:  sourceCodeHostService,
 		DatabaseService:        databaseService,
 		RepositoryRecord:       repositoryRecord,
-		AnalyzedCommits:        []database.CommitRecord{},
+		AnalyzedCommits:        []repository.CommitRecord{},
 	}, nil
 }
 
-func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context) ([]database.CommitRecord, []error) {
+func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context) ([]repository.CommitRecord, []error) {
 	commits := make(chan string)
-	records := make(chan database.Record)
+	records := make(chan repository.Record)
 	errors := make(chan error)
 
 	// Set up workers
@@ -78,7 +78,7 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context) ([]database
 	return ra.AnalyzedCommits, errorsSlice
 }
 
-func getOrCreateRepositoryRecord(ctx context.Context, databaseService database.DatabaseService, sourceCodeHostService sourcecodehost.SourcecodeHostService, id int64) (*database.RepositoryRecord, error) {
+func getOrCreateRepositoryRecord(ctx context.Context, databaseService repository.DatabaseService, sourceCodeHostService sourcecodehost.SourcecodeHostService, id int64) (*repository.RepositoryRecord, error) {
 	repo, ok, err := databaseService.GetRepository(ctx, id)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func getOrCreateRepositoryRecord(ctx context.Context, databaseService database.D
 		return repo, nil
 	}
 
-	repo, err = database.NewRepositoryRecord(sourceCodeHostService)
+	repo, err = repository.NewRepositoryRecord(sourceCodeHostService)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func getOrCreateRepositoryRecord(ctx context.Context, databaseService database.D
 	return repo, nil
 }
 
-func (ra *RepositoryAnalyzer) commitAnalyzerWorker(ctx context.Context, commits <-chan string, records chan<- database.Record, wg *sync.WaitGroup, errors chan<- error) {
+func (ra *RepositoryAnalyzer) commitAnalyzerWorker(ctx context.Context, commits <-chan string, records chan<- repository.Record, wg *sync.WaitGroup, errors chan<- error) {
 	defer wg.Done()
 
 	for commitSHA := range commits {
@@ -132,7 +132,7 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(ctx context.Context, commits 
 			continue
 		}
 
-		commitRecord, err := database.NewCommitRecord(ctx, ra.SourceCodeHostService, commitSHA, &analysis.Commit)
+		commitRecord, err := repository.NewCommitRecord(ctx, ra.SourceCodeHostService, commitSHA, &analysis.Commit)
 		if err != nil {
 			errors <- fmt.Errorf("error creating commit record: %s", err.Error())
 			continue
@@ -140,7 +140,7 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(ctx context.Context, commits 
 		records <- commitRecord
 
 		for _, subcommit := range analysis.Subcommits {
-			subcommitRecord := database.NewSubcommitRecord(commitSHA, &subcommit)
+			subcommitRecord := repository.NewSubcommitRecord(commitSHA, &subcommit)
 			records <- subcommitRecord
 		}
 
@@ -150,7 +150,7 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(ctx context.Context, commits 
 	}
 }
 
-func (ra *RepositoryAnalyzer) databaseInserterWorker(ctx context.Context, records <-chan database.Record, wg *sync.WaitGroup, errors chan<- error) {
+func (ra *RepositoryAnalyzer) databaseInserterWorker(ctx context.Context, records <-chan repository.Record, wg *sync.WaitGroup, errors chan<- error) {
 	defer wg.Done()
 
 	for record := range records {

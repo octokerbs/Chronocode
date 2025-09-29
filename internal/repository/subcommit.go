@@ -1,10 +1,10 @@
-package database
+package repository
 
 import (
 	"context"
 	"time"
 
-	"github.com/chrono-code-hackathon/chronocode-go/internal/agent"
+	"github.com/octokerbs/chronocode-go/internal/domain/agent"
 )
 
 type SubcommitRecord struct {

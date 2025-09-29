@@ -1,4 +1,4 @@
-package handlers
+package api
 
 import (
 	"context"
@@ -6,20 +6,18 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/chrono-code-hackathon/chronocode-go/internal"
-	"github.com/chrono-code-hackathon/chronocode-go/internal/services/gemini"
-	"github.com/chrono-code-hackathon/chronocode-go/internal/services/githubapi"
-	"github.com/chrono-code-hackathon/chronocode-go/internal/services/supabase"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/octokerbs/chronocode-go/internal"
+	"github.com/octokerbs/chronocode-go/internal/domain/agent/gemini"
+	"github.com/octokerbs/chronocode-go/internal/domain/sourcecodehost/githubapi"
+	"github.com/octokerbs/chronocode-go/internal/repository/supabase"
 )
 
 func AnalyzeRepositoryHandler(c *gin.Context) {
-	// Read query parameters
 	accessToken := c.Query("access_token")
 	repoURL := c.Query("repo_url")
 
-	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		fmt.Println("Error loading .env file")
 	}

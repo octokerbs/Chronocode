@@ -3,9 +3,10 @@ package githubapi
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
-	"github.com/chrono-code-hackathon/chronocode-go/internal/utils"
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
 )
@@ -38,7 +39,7 @@ func NewGithubClient(ctx context.Context, accessToken string, repoURL string) (*
 }
 
 func getRepository(ctx context.Context, client *github.Client, repoURL string) (*github.Repository, error) {
-	owner, repo, err := utils.ParseRepoURL(repoURL)
+	owner, repo, err := parseRepoURL(repoURL)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing repository URL: %v", err.Error())
 	}
@@ -49,6 +50,28 @@ func getRepository(ctx context.Context, client *github.Client, repoURL string) (
 	}
 
 	return githubRepository, nil
+}
+
+func parseRepoURL(repoURL string) (string, string, error) {
+	parsedURL, err := url.Parse(repoURL)
+	if err != nil {
+		return "", "", err
+	}
+
+	if parsedURL.Host != "github.com" {
+		return "", "", fmt.Errorf("not supported version control repository")
+	}
+
+	// Remove leading slash and split path
+	pathParts := strings.Split(strings.TrimPrefix(parsedURL.Path, "/"), "/")
+	if len(pathParts) < 2 {
+		return "", "", fmt.Errorf("invalid GitHub repository URL format")
+	}
+
+	// Handle potential .git suffix
+	repoName := strings.TrimSuffix(pathParts[1], ".git")
+
+	return pathParts[0], repoName, nil
 }
 
 func (g *GithubService) ProduceCommits(ctx context.Context, lastAnalyzedCommitSHA string, commits chan<- string, errors chan<- error) {

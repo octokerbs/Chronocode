@@ -1,4 +1,4 @@
-module github.com/chrono-code-hackathon/chronocode-go
+module github.com/octokerbs/chronocode-go
 
 go 1.23.0
 

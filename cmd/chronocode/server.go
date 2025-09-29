@@ -3,17 +3,24 @@ package main
 import (
 	"log"
 
-	"github.com/chrono-code-hackathon/chronocode-go/internal/handlers"
 	"github.com/gin-gonic/gin"
+	"github.com/octokerbs/chronocode-go/internal/api"
 )
 
-func main() {
-	r := gin.Default()
+type Server struct {
+	anEngine *gin.Engine
+	aPort    string
+}
 
+func NewServer(aPort string) Server {
+	engine := gin.Default()
 	log.SetFlags(log.LstdFlags)
 
-	// Production
-	r.GET("/analyze-repository", handlers.AnalyzeRepositoryHandler)
+	engine.GET("/analyze-repository", api.AnalyzeRepositoryHandler)
 
-	r.Run("localhost:8080")
+	return Server{engine, aPort}
+}
+
+func (s Server) Run() {
+	s.anEngine.Run(s.aPort)
 }
