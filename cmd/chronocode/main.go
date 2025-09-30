@@ -1,6 +1,10 @@
 package main
 
 func main() {
-	server := NewServer(":8080")
+	server, err := NewServer(":8080")
+	if err != nil {
+		panic(err)
+	}
+
 	server.Run()
 }
