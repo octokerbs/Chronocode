@@ -1,9 +1,9 @@
-package agent
+package domain
 
 import (
 	"context"
 )
 
-type AgentClient interface {
+type Agent interface {
 	Generate(ctx context.Context, prompt string) ([]byte, error)
 }

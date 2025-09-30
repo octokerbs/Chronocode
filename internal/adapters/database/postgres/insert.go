@@ -4,17 +4,17 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/octokerbs/chronocode-go/internal/repository"
+	"github.com/octokerbs/chronocode-go/internal/domain"
 )
 
-func (p *PostgresClient) InsertRepository(ctx context.Context, repo *repository.RepositoryRecord) error {
+func (p *PostgresClient) InsertRepository(ctx context.Context, repo *domain.RepositoryRecord) error {
 	_, err := p.db.ExecContext(ctx, `INSERT INTO repository (id, created_at, name, url, last_analyzed_commit) VALUES ($1, $2, $3, $4, $5)
 	ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, url = EXCLUDED.url, last_analyzed_commit = EXCLUDED.last_analyzed_commit`,
 		repo.ID, repo.CreatedAt, repo.Name, repo.URL, repo.LastAnalyzedCommit)
 	return err
 }
 
-func (p *PostgresClient) InsertCommit(ctx context.Context, commit *repository.CommitRecord) error {
+func (p *PostgresClient) InsertCommit(ctx context.Context, commit *domain.CommitRecord) error {
 	_, err := p.db.ExecContext(ctx, `
 		INSERT INTO "commit" (
 			sha, author, date, message, url, author_email, description, author_url, files, repo_id
@@ -39,7 +39,7 @@ func (p *PostgresClient) InsertCommit(ctx context.Context, commit *repository.Co
 	return nil
 }
 
-func (p *PostgresClient) InsertSubcommit(ctx context.Context, subcommit *repository.SubcommitRecord) error {
+func (p *PostgresClient) InsertSubcommit(ctx context.Context, subcommit *domain.SubcommitRecord) error {
 	_, err := p.db.ExecContext(ctx, `INSERT INTO subcommit (
 		id, created_at, title, idea, description, commit_sha, type, epic, files
 	) VALUES (

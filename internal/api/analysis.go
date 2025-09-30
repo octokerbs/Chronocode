@@ -4,14 +4,14 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/octokerbs/chronocode-go/internal/service"
+	"github.com/octokerbs/chronocode-go/internal/application"
 )
 
 type AnalysisHandler struct {
-	repoAnalyzer *service.RepositoryAnalyzer
+	repoAnalyzer *application.RepositoryAnalyzer
 }
 
-func NewAnalysisHandler(repoAnalyzer *service.RepositoryAnalyzer) *AnalysisHandler {
+func NewAnalysisHandler(repoAnalyzer *application.RepositoryAnalyzer) *AnalysisHandler {
 	return &AnalysisHandler{repoAnalyzer}
 }
 

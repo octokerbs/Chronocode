@@ -1,10 +1,10 @@
-package repository
+package domain
 
 import (
 	"context"
 )
 
-type DatabaseClient interface {
+type Database interface {
 	InsertRepository(ctx context.Context, repo *RepositoryRecord) error
 	InsertCommit(ctx context.Context, commit *CommitRecord) error
 	InsertSubcommit(ctx context.Context, subcommit *SubcommitRecord) error
@@ -13,5 +13,5 @@ type DatabaseClient interface {
 }
 
 type Record interface {
-	InsertIntoDatabase(ctx context.Context, databaseService DatabaseClient) error
+	InsertIntoDatabase(ctx context.Context, database Database) error
 }

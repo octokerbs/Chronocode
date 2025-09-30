@@ -1,12 +1,9 @@
-package repository
+package domain
 
 import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/octokerbs/chronocode-go/internal/domain/agent"
-	"github.com/octokerbs/chronocode-go/internal/domain/codehost"
 )
 
 type CommitRecord struct {
@@ -23,8 +20,8 @@ type CommitRecord struct {
 	RepoID      int64      `json:"repo_id" sql:"repo_id"`                 // Completed manually via API data
 }
 
-func NewCommitRecord(ctx context.Context, repoURL string, sourceCodeService codehost.CodeHostClient, commitSHA string, commitAnalysis *agent.CommitSchema) (*CommitRecord, error) {
-	commitData, err := sourceCodeService.GetCommitData(ctx, repoURL, commitSHA)
+func NewCommitRecord(ctx context.Context, repoURL string, codeHost CodeHost, commitSHA string, commit *Commit) (*CommitRecord, error) {
+	commitData, err := codeHost.GetCommitData(ctx, repoURL, commitSHA)
 	if err != nil {
 		return nil, err
 	}
@@ -76,14 +73,14 @@ func NewCommitRecord(ctx context.Context, repoURL string, sourceCodeService code
 		Message:     message,
 		URL:         url,
 		AuthorEmail: authorEmail,
-		Description: commitAnalysis.Description,
+		Description: commit.Description,
 		AuthorURL:   author_url,
 		Files:       files,
 		RepoID:      repositoryId,
 	}, nil
 }
 
-func (cr *CommitRecord) InsertIntoDatabase(ctx context.Context, databaseService DatabaseClient) error {
-	err := databaseService.InsertCommit(ctx, cr)
+func (cr *CommitRecord) InsertIntoDatabase(ctx context.Context, database Database) error {
+	err := database.InsertCommit(ctx, cr)
 	return err
 }

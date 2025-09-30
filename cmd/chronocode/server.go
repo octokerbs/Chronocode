@@ -6,10 +6,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/octokerbs/chronocode-go/internal/adapters/agent/gemini"
+	githubapi "github.com/octokerbs/chronocode-go/internal/adapters/codehost/github"
+	"github.com/octokerbs/chronocode-go/internal/adapters/database/postgres"
 	"github.com/octokerbs/chronocode-go/internal/api"
-	"github.com/octokerbs/chronocode-go/internal/domain/agent/gemini"
-	"github.com/octokerbs/chronocode-go/internal/repository/postgres"
-	"github.com/octokerbs/chronocode-go/internal/service"
+	"github.com/octokerbs/chronocode-go/internal/application"
 )
 
 type Server struct {
@@ -29,12 +30,14 @@ func NewServer(port string) (*Server, error) {
 		return nil, err
 	}
 
+	githubFactory := githubapi.NewGithubFactory()
+
 	pgClient, err := postgres.NewPostgresClient(ctx, os.Getenv("POSTGRES_DSN"))
 	if err != nil {
 		return nil, err
 	}
 
-	repoAnalyzer := service.NewRepositoryAnalyzer(ctx, geminiClient, pgClient)
+	repoAnalyzer := application.NewRepositoryAnalyzer(ctx, geminiClient, githubFactory, pgClient)
 
 	handler := api.NewAnalysisHandler(repoAnalyzer)
 

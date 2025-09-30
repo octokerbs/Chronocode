@@ -1,4 +1,4 @@
-package agent
+package domain
 
 var CommitAnalysisPrompt string = `
     	You are a Commit Expert Analyzer specializing in code analysis and software development patterns.

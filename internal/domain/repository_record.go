@@ -1,11 +1,9 @@
-package repository
+package domain
 
 import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/octokerbs/chronocode-go/internal/domain/codehost"
 )
 
 type RepositoryRecord struct {
@@ -16,8 +14,8 @@ type RepositoryRecord struct {
 	LastAnalyzedCommit string     `json:"last_analyzed_commit" db:"last_analyzed_commit"`
 }
 
-func NewRepositoryRecord(ctx context.Context, repoURL string, sourceCodeService codehost.CodeHostClient) (*RepositoryRecord, error) {
-	repoData, err := sourceCodeService.GetRepositoryData(ctx, repoURL)
+func NewRepositoryRecord(ctx context.Context, repoURL string, codeHost CodeHost) (*RepositoryRecord, error) {
+	repoData, err := codeHost.GetRepositoryData(ctx, repoURL)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +39,7 @@ func NewRepositoryRecord(ctx context.Context, repoURL string, sourceCodeService 
 	}, nil
 }
 
-func (rr *RepositoryRecord) InsertIntoDatabase(ctx context.Context, databaseService DatabaseClient) error {
-	err := databaseService.InsertRepository(ctx, rr)
+func (rr *RepositoryRecord) InsertIntoDatabase(ctx context.Context, database Database) error {
+	err := database.InsertRepository(ctx, rr)
 	return err
 }

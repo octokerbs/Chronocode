@@ -1,10 +1,8 @@
-package repository
+package domain
 
 import (
 	"context"
 	"time"
-
-	"github.com/octokerbs/chronocode-go/internal/domain/agent"
 )
 
 type SubcommitRecord struct {
@@ -19,19 +17,19 @@ type SubcommitRecord struct {
 	Files       []string   `json:"files" sql:"files"`
 }
 
-func NewSubcommitRecord(commitSHA string, subcommitAnalysis *agent.SubcommitSchema) *SubcommitRecord {
+func NewSubcommitRecord(commitSHA string, subcommit *Subcommit) *SubcommitRecord {
 	return &SubcommitRecord{
-		Title:       subcommitAnalysis.Title,
-		Idea:        subcommitAnalysis.Idea,
-		Description: subcommitAnalysis.Description,
+		Title:       subcommit.Title,
+		Idea:        subcommit.Idea,
+		Description: subcommit.Description,
 		CommitSHA:   commitSHA,
-		Type:        subcommitAnalysis.Type,
-		Epic:        subcommitAnalysis.Epic,
-		Files:       subcommitAnalysis.Files,
+		Type:        subcommit.Type,
+		Epic:        subcommit.Epic,
+		Files:       subcommit.Files,
 	}
 }
 
-func (sr *SubcommitRecord) InsertIntoDatabase(ctx context.Context, databaseService DatabaseClient) error {
-	err := databaseService.InsertSubcommit(ctx, sr)
+func (sr *SubcommitRecord) InsertIntoDatabase(ctx context.Context, database Database) error {
+	err := database.InsertSubcommit(ctx, sr)
 	return err
 }

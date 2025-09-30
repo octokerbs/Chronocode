@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/octokerbs/chronocode-go/internal/repository"
+	"github.com/octokerbs/chronocode-go/internal/domain"
 )
 
-func (p *PostgresClient) GetRepository(ctx context.Context, id int64) (*repository.RepositoryRecord, bool, error) {
-	var repo repository.RepositoryRecord
+func (p *PostgresClient) GetRepository(ctx context.Context, id int64) (*domain.RepositoryRecord, bool, error) {
+	var repo domain.RepositoryRecord
 	row := p.db.QueryRowContext(ctx, "SELECT * FROM repository WHERE id = $1", id)
 	err := row.Scan(
 		&repo.ID,
