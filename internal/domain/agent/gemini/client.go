@@ -8,24 +8,24 @@ import (
 	"google.golang.org/api/option"
 )
 
-type GeminiGenerativeService struct {
-	geminiService *genai.Client
-	model         *genai.GenerativeModel
+type GeminiClient struct {
+	client *genai.Client
+	model  *genai.GenerativeModel
 }
 
-func NewGeminiGenerativeService(ctx context.Context, key string) (*GeminiGenerativeService, error) {
-	geminiService, err := genai.NewClient(ctx, option.WithAPIKey(key))
+func NewGeminiClient(ctx context.Context, key string) (*GeminiClient, error) {
+	client, err := genai.NewClient(ctx, option.WithAPIKey(key))
 	if err != nil {
 		return nil, err
 	}
-	model := geminiService.GenerativeModel("gemini-2.0-flash")
+	model := client.GenerativeModel("gemini-2.0-flash")
 	model.ResponseMIMEType = "application/json"
-	model.ResponseSchema = commitSchema
-	return &GeminiGenerativeService{geminiService: geminiService, model: model}, nil
+	model.ResponseSchema = CommitAnalysisSchema
+	return &GeminiClient{client: client, model: model}, nil
 }
 
-func (g *GeminiGenerativeService) Generate(ctx context.Context, prompt string) ([]byte, error) {
-	resp, err := g.model.GenerateContent(ctx, genai.Text(prompt))
+func (gc *GeminiClient) Generate(ctx context.Context, prompt string) ([]byte, error) {
+	resp, err := gc.model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
 		return nil, fmt.Errorf("error generating content %v", err.Error())
 	}
@@ -39,6 +39,6 @@ func (g *GeminiGenerativeService) Generate(ctx context.Context, prompt string) (
 	return nil, fmt.Errorf("no text response parts found for commit")
 }
 
-func (g *GeminiGenerativeService) Close() {
-	g.geminiService.Close()
+func (gc *GeminiClient) Close() {
+	gc.client.Close()
 }

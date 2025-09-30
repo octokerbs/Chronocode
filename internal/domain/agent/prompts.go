@@ -5,7 +5,6 @@ var CommitAnalysisPrompt string = `
     	You will receive a Git Commit diff.
     	Your task is to given commit, identify the logical units of work ("SubCommits") within this single GitHub commit. 
     	The subcommits will have a title, idea, description, and type.
-    
+
     	Now extract the subcommits from the following diff:
-    
     	`

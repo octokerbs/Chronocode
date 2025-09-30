@@ -4,6 +4,6 @@ import (
 	"context"
 )
 
-type GenerativeAgentService interface {
+type AgentClient interface {
 	Generate(ctx context.Context, prompt string) ([]byte, error)
 }

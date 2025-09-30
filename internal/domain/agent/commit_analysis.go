@@ -1,6 +1,8 @@
 package agent
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type CommitAnalysisSchema struct {
 	Commit     CommitSchema      `json:"commit"`
