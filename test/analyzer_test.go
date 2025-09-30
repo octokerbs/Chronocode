@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/octokerbs/chronocode-go/internal"
 	"github.com/octokerbs/chronocode-go/internal/repository"
+	"github.com/octokerbs/chronocode-go/internal/service"
 	"github.com/octokerbs/chronocode-go/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -35,7 +35,7 @@ func (a *AnalyzerTestSuite) TestCannotFetchRepositoryRecordWithInvalidID() {
 
 	a.repository.On("GetRepository").Return(&repository.RepositoryRecord{}, false, errors.New("repository id not found in repository"))
 
-	_, err := internal.NewRepositoryAnalyzer(ctx, a.agent, a.sourcecodeHost, a.repository)
+	_, err := service.NewRepositoryAnalyzer(ctx, a.agent, a.sourcecodeHost, a.repository)
 	assert.EqualError(a.T(), err, "repository id not found in repository")
 }
 
