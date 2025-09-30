@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-type DatabaseService interface {
+type DatabaseClient interface {
 	InsertRepository(ctx context.Context, repo *RepositoryRecord) error
 	InsertCommit(ctx context.Context, commit *CommitRecord) error
 	InsertSubcommit(ctx context.Context, subcommit *SubcommitRecord) error
@@ -13,5 +13,5 @@ type DatabaseService interface {
 }
 
 type Record interface {
-	InsertIntoDatabase(ctx context.Context, databaseService DatabaseService) error
+	InsertIntoDatabase(ctx context.Context, databaseService DatabaseClient) error
 }

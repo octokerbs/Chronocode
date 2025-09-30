@@ -5,19 +5,22 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/octokerbs/chronocode-go/internal/domain/sourcecodehost"
+	"github.com/octokerbs/chronocode-go/internal/domain/codehost"
 )
 
 type RepositoryRecord struct {
-	ID                 int64      `json:"id"`
-	CreatedAt          *time.Time `json:"created_at,omitempty"` // Completed via supabase
-	Name               string     `json:"name"`
-	URL                string     `json:"url"`
-	LastAnalyzedCommit string     `json:"last_analyzed_commit"`
+	ID                 int64      `json:"id" db:"id"`
+	CreatedAt          *time.Time `json:"created_at,omitempty" db:"created_at"`
+	Name               string     `json:"name" db:"name"`
+	URL                string     `json:"url" db:"url"`
+	LastAnalyzedCommit string     `json:"last_analyzed_commit" db:"last_analyzed_commit"`
 }
 
-func NewRepositoryRecord(sourceCodeService sourcecodehost.SourcecodeHostService) (*RepositoryRecord, error) {
-	repoData := sourceCodeService.GetRepositoryData()
+func NewRepositoryRecord(ctx context.Context, repoURL string, sourceCodeService codehost.CodeHostClient) (*RepositoryRecord, error) {
+	repoData, err := sourceCodeService.GetRepositoryData(ctx, repoURL)
+	if err != nil {
+		return nil, err
+	}
 
 	id, ok := repoData["id"].(int64)
 	if !ok {
@@ -30,20 +33,15 @@ func NewRepositoryRecord(sourceCodeService sourcecodehost.SourcecodeHostService)
 
 	}
 
-	url, ok := repoData["url"].(string)
-	if !ok {
-		return nil, fmt.Errorf("bad data type from Source Code service when fetching URL from repository data")
-	}
-
 	return &RepositoryRecord{
 		ID:                 id,
 		Name:               name,
-		URL:                url,
+		URL:                repoURL,
 		LastAnalyzedCommit: "",
 	}, nil
 }
 
-func (rr *RepositoryRecord) InsertIntoDatabase(ctx context.Context, databaseService DatabaseService) error {
+func (rr *RepositoryRecord) InsertIntoDatabase(ctx context.Context, databaseService DatabaseClient) error {
 	err := databaseService.InsertRepository(ctx, rr)
 	return err
 }
