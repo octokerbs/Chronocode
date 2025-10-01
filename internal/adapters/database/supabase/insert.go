@@ -3,11 +3,11 @@ package supabase
 import (
 	"context"
 
-	"github.com/octokerbs/chronocode-go/internal/repository"
+	"github.com/octokerbs/chronocode-go/internal/domain"
 )
 
-func (s *SupabaseService) InsertRepository(ctx context.Context, repo *repository.RepositoryRecord) error {
-	var results []repository.RepositoryRecord
+func (s *SupabaseService) InsertRepository(ctx context.Context, repo *domain.RepositoryRecord) error {
+	var results []domain.RepositoryRecord
 	err := s.client.DB.From("repositories").Upsert(repo).Execute(&results)
 	if err != nil {
 		return err
@@ -15,8 +15,8 @@ func (s *SupabaseService) InsertRepository(ctx context.Context, repo *repository
 	return nil
 }
 
-func (s *SupabaseService) InsertCommit(ctx context.Context, commit *repository.CommitRecord) error {
-	var results []repository.CommitRecord
+func (s *SupabaseService) InsertCommit(ctx context.Context, commit *domain.CommitRecord) error {
+	var results []domain.CommitRecord
 	err := s.client.DB.From("commits").Upsert(commit).Execute(&results)
 	if err != nil {
 		return err
@@ -24,8 +24,8 @@ func (s *SupabaseService) InsertCommit(ctx context.Context, commit *repository.C
 	return nil
 }
 
-func (s *SupabaseService) InsertSubcommit(ctx context.Context, subcommit *repository.SubcommitRecord) error {
-	var results []repository.SubcommitRecord
+func (s *SupabaseService) InsertSubcommit(ctx context.Context, subcommit *domain.SubcommitRecord) error {
+	var results []domain.SubcommitRecord
 	err := s.client.DB.From("subcommits").Upsert(subcommit).Execute(&results)
 	if err != nil {
 		return err

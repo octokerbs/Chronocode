@@ -4,11 +4,11 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/octokerbs/chronocode-go/internal/repository"
+	"github.com/octokerbs/chronocode-go/internal/domain"
 )
 
-func (s *SupabaseService) GetRepository(ctx context.Context, id int64) (*repository.RepositoryRecord, bool, error) {
-	var results []repository.RepositoryRecord
+func (s *SupabaseService) GetRepository(ctx context.Context, id int64) (*domain.RepositoryRecord, bool, error) {
+	var results []domain.RepositoryRecord
 	err := s.client.DB.From("repositories").Select("*").Eq("id", strconv.FormatInt(id, 10)).Execute(&results)
 	if err != nil {
 		return nil, false, err
