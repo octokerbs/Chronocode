@@ -143,6 +143,7 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(ctx context.Context, codeHost
 			errors <- fmt.Sprintf("error creating commit record: %s", err.Error())
 			continue
 		}
+
 		records <- commitRecord
 
 		for _, subcommit := range analysis.Subcommits {
