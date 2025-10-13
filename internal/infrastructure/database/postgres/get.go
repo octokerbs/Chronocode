@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/octokerbs/chronocode-go/internal/domain"
+	"github.com/octokerbs/chronocode-backend/internal/domain"
 )
 
 func (p *PostgresClient) GetRepository(ctx context.Context, id int64) (*domain.RepositoryRecord, bool, error) {

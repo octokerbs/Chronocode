@@ -1,4 +1,4 @@
-module github.com/octokerbs/chronocode-go
+module github.com/octokerbs/chronocode-backend
 
 go 1.23.0
 

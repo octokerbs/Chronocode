@@ -1,11 +1,11 @@
-package application
+package usecase
 
 import (
 	"context"
 	"fmt"
 	"sync"
 
-	"github.com/octokerbs/chronocode-go/internal/domain"
+	"github.com/octokerbs/chronocode-backend/internal/domain"
 )
 
 type RepositoryAnalyzer struct {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/octokerbs/chronocode-go/internal/domain"
+	"github.com/octokerbs/chronocode-backend/internal/domain"
 )
 
 func (p *PostgresClient) InsertRepository(ctx context.Context, repo *domain.RepositoryRecord) error {

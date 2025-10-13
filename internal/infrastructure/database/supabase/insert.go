@@ -3,7 +3,7 @@ package supabase
 import (
 	"context"
 
-	"github.com/octokerbs/chronocode-go/internal/domain"
+	"github.com/octokerbs/chronocode-backend/internal/domain"
 )
 
 func (s *SupabaseService) InsertRepository(ctx context.Context, repo *domain.RepositoryRecord) error {
