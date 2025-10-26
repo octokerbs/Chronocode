@@ -169,7 +169,6 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(ctx context.Context, codeHost
 		subcommits := analysis.Subcommits
 		for i := range subcommits {
 			subcommits[i].CommitSHA = commitSHA
-			records <- &subcommits[i]
 		}
 
 		ra.saveCommitAnalysis(commit, subcommits, records)
