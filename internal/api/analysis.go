@@ -27,7 +27,7 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		return
 	}
 
-	commits, errors, err := h.repoAnalyzer.AnalyzeRepository(c.Request.Context(), repoURL, accessToken)
+	commits, subcommits, errors, err := h.repoAnalyzer.AnalyzeRepository(c.Request.Context(), repoURL, accessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
@@ -45,6 +45,7 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		"status":         "success",
 		"analyses_count": len(commits),
 		"commits":        commits,
+		"subcommits":     subcommits,
 		"advisory":       advisory,
 		"errors":         errors,
 	})
