@@ -2,7 +2,6 @@ package mock
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/octokerbs/chronocode-backend/internal/application"
 	"github.com/octokerbs/chronocode-backend/internal/domain"
@@ -31,7 +30,6 @@ func (pm *PostgresMock) GetRepository(ctx context.Context, id int64) (*domain.Re
 }
 
 func (pm *PostgresMock) ProcessRecords(ctx context.Context, records <-chan application.DatabaseRecord, errors chan<- string) {
-	for record := range records {
-		fmt.Println("Inserting ", record)
+	for range records {
 	}
 }
