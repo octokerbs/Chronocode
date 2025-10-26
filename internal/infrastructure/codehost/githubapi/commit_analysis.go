@@ -8,9 +8,20 @@ import (
 	"time"
 
 	"github.com/google/go-github/github"
+	"github.com/octokerbs/chronocode-backend/internal/application"
 	"github.com/octokerbs/chronocode-backend/internal/domain"
 	"golang.org/x/oauth2"
 )
+
+type GithubFactory struct{}
+
+func NewGithubFactory() *GithubFactory {
+	return &GithubFactory{}
+}
+
+func (f *GithubFactory) Create(ctx context.Context, accessToken string) (application.CodeHost, error) {
+	return NewGithubClient(ctx, accessToken)
+}
 
 type GithubClient struct {
 	client  *github.Client
@@ -31,6 +42,34 @@ func NewGithubClient(ctx context.Context, accessToken string) (*GithubClient, er
 	}
 
 	return &GithubClient{client, options}, nil
+}
+
+func (gc *GithubClient) ProduceCommits(ctx context.Context, repoURL string, lastAnalyzedCommitSHA string, commits chan<- string, errors chan<- string) {
+	repository, err := getRepository(ctx, gc.client, repoURL)
+	if err != nil {
+		errors <- fmt.Sprintf("error finding repository: %v", err.Error())
+		return
+	}
+
+	gc.options.SHA = lastAnalyzedCommitSHA
+
+	for {
+		pageCommits, resp, err := gc.client.Repositories.ListCommits(ctx, *repository.Owner.Login, *repository.Name, gc.options)
+		if err != nil {
+			errors <- fmt.Sprintf("error fetching commits: %v", err.Error())
+			return
+		}
+
+		for _, commit := range pageCommits {
+			commits <- *commit.SHA
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+
+		gc.options.ListOptions.Page = resp.NextPage
+	}
 }
 
 func getRepository(ctx context.Context, client *github.Client, repoURL string) (*github.Repository, error) {
@@ -69,34 +108,6 @@ func parseRepoURL(repoURL string) (string, string, error) {
 	return pathParts[0], repoName, nil
 }
 
-func (gc *GithubClient) ProduceCommits(ctx context.Context, repoURL string, lastAnalyzedCommitSHA string, commits chan<- string, errors chan<- string) {
-	repository, err := getRepository(ctx, gc.client, repoURL)
-	if err != nil {
-		errors <- fmt.Sprintf("error finding repository: %v", err.Error())
-		return
-	}
-
-	gc.options.SHA = lastAnalyzedCommitSHA
-
-	for {
-		pageCommits, resp, err := gc.client.Repositories.ListCommits(ctx, *repository.Owner.Login, *repository.Name, gc.options)
-		if err != nil {
-			errors <- fmt.Sprintf("error fetching commits: %v", err.Error())
-			return
-		}
-
-		for _, commit := range pageCommits {
-			commits <- *commit.SHA
-		}
-
-		if resp.NextPage == 0 {
-			break
-		}
-
-		gc.options.ListOptions.Page = resp.NextPage
-	}
-}
-
 func (gc *GithubClient) GetCommitDiff(ctx context.Context, repoURL string, commitSHA string) (string, error) {
 	repository, err := getRepository(ctx, gc.client, repoURL)
 	if err != nil {
@@ -118,15 +129,6 @@ func (gc *GithubClient) GetCommitDiff(ctx context.Context, repoURL string, commi
 	}
 
 	return diff, nil
-}
-
-func (gc *GithubClient) RepositoryID(ctx context.Context, repoURL string) (int64, error) {
-	repository, err := getRepository(ctx, gc.client, repoURL)
-	if err != nil {
-		return 0, err
-	}
-
-	return *repository.ID, nil
 }
 
 func (gc *GithubClient) NewRepository(ctx context.Context, repoURL string) (*domain.Repository, error) {
@@ -168,4 +170,13 @@ func (gc *GithubClient) NewCommit(ctx context.Context, repoURL string, commitSHA
 		Files:       files,
 		RepoID:      *repository.ID,
 	}, nil
+}
+
+func (gc *GithubClient) RepositoryID(ctx context.Context, repoURL string) (int64, error) {
+	repository, err := getRepository(ctx, gc.client, repoURL)
+	if err != nil {
+		return 0, err
+	}
+
+	return *repository.ID, nil
 }

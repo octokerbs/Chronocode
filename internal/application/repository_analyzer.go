@@ -8,6 +8,7 @@ import (
 	"github.com/octokerbs/chronocode-backend/internal/domain"
 )
 
+// CodeHost is the service that allocates our code and gives us access to different aspects of it
 type CodeHostFactory interface {
 	Create(ctx context.Context, accessToken string) (CodeHost, error)
 }
@@ -22,14 +23,12 @@ type CodeHost interface {
 	RepositoryID(ctx context.Context, repoURL string) (int64, error)
 }
 
+// Agent is the LLM that we use to process our commits giving us descriptions and generating subcommits
 type Agent interface {
-	Generate(ctx context.Context, prompt string) ([]byte, error)
+	AnalyzeDiff(ctx context.Context, diff string) (domain.CommitAnalysis, error)
 }
 
-type DatabaseRecord interface {
-	IsDatabaseRecord()
-}
-
+// Database is where we store our repositories, commit data and subcommit data.
 type Database interface {
 	InsertRepositoryRecord(ctx context.Context, repo *domain.Repository) error
 	InsertCommitRecord(ctx context.Context, commit *domain.Commit) error
@@ -39,28 +38,36 @@ type Database interface {
 	ProcessRecords(ctx context.Context, records <-chan DatabaseRecord, errors chan<- string)
 }
 
+type DatabaseRecord interface {
+	IsDatabaseRecord()
+}
+
+// RepositoryAnalyzer fetches our repo and gives us an analysis on all the commits, generating also the subcommits.
+// This is our principal orquestator for the app.
 type RepositoryAnalyzer struct {
 	Agent           Agent
 	CodeHostFactory CodeHostFactory
 	Database        Database
 
 	AnalyzedCommits      []domain.Commit
+	AnalyzerSubcommits   []domain.Subcommit
 	analyzedCommitsMutex sync.Mutex
 }
 
 func NewRepositoryAnalyzer(ctx context.Context, agent Agent, factory CodeHostFactory, database Database) *RepositoryAnalyzer {
 	return &RepositoryAnalyzer{
-		Agent:           agent,
-		CodeHostFactory: factory,
-		Database:        database,
-		AnalyzedCommits: []domain.Commit{},
+		Agent:              agent,
+		CodeHostFactory:    factory,
+		Database:           database,
+		AnalyzedCommits:    []domain.Commit{},
+		AnalyzerSubcommits: []domain.Subcommit{},
 	}
 }
 
-func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL string, accessToken string) ([]domain.Commit, []string, error) {
+func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL string, accessToken string) ([]domain.Commit, []domain.Subcommit, []string, error) {
 	codeHost, err := ra.CodeHostFactory.Create(ctx, accessToken)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create GitHub client: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to create GitHub client: %w", err)
 	}
 
 	commits := make(chan string)
@@ -69,7 +76,7 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL str
 
 	repo, err := getOrCreateRepositoryRecord(ctx, repoURL, ra.Database, codeHost)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Set up workers
@@ -107,7 +114,7 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL str
 		errorsSlice = append(errorsSlice, e)
 	}
 
-	return ra.AnalyzedCommits, errorsSlice, nil
+	return ra.AnalyzedCommits, ra.AnalyzerSubcommits, errorsSlice, nil
 }
 
 func getOrCreateRepositoryRecord(ctx context.Context, repoURL string, database Database, codeHost CodeHost) (*domain.Repository, error) {
@@ -145,47 +152,39 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(ctx context.Context, codeHost
 			continue
 		}
 
-		prompt := domain.CommitAnalysisPrompt + diff
-
-		tries := 3
-		var text []byte
-		for tries > 0 {
-			text, err = ra.Agent.Generate(ctx, prompt)
-			if err != nil {
-				tries--
-				continue
-			}
-			break
-		}
-
-		if tries == 0 {
-			errors <- "no text response parts found for commit"
-			continue
-		}
-
-		// TODO: Primero crear el commit, despues cargarle la data como la descripcion o los subcommits.
-		analysis, err := domain.UnmarshalCommitAnalysisSchemaOntoStruct(text)
+		analysis, err := ra.Agent.AnalyzeDiff(ctx, diff)
 		if err != nil {
 			errors <- fmt.Sprintf("error unmarshaling response: %s", err.Error())
 			continue
 		}
 
-		commitRecord, err := codeHost.NewCommit(ctx, repoURL, commitSHA)
+		commit, err := codeHost.NewCommit(ctx, repoURL, commitSHA)
 		if err != nil {
 			errors <- fmt.Sprintf("error creating commit record: %s", err.Error())
 			continue
 		}
 
-		records <- commitRecord
+		commit.Description = analysis.Commit.Description
 
-		for _, subcommit := range analysis.Subcommits {
-			subcommit.CommitSHA = commitSHA
-			records <- &subcommit
+		subcommits := analysis.Subcommits
+		for i := range subcommits {
+			subcommits[i].CommitSHA = commitSHA
+			records <- &subcommits[i]
 		}
 
+		ra.saveCommitAnalysis(commit, subcommits, records)
+
 		ra.analyzedCommitsMutex.Lock()
-		ra.AnalyzedCommits = append(ra.AnalyzedCommits, *commitRecord)
+		ra.AnalyzedCommits = append(ra.AnalyzedCommits, *commit)
+		ra.AnalyzerSubcommits = append(ra.AnalyzerSubcommits, subcommits...)
 		ra.analyzedCommitsMutex.Unlock()
+	}
+}
+
+func (ra *RepositoryAnalyzer) saveCommitAnalysis(commit *domain.Commit, subcommits []domain.Subcommit, records chan<- DatabaseRecord) {
+	records <- commit
+	for _, subcommit := range subcommits {
+		records <- &subcommit
 	}
 }
 
