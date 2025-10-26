@@ -3,7 +3,7 @@ package githubapi
 import (
 	"context"
 
-	"github.com/octokerbs/chronocode-backend/internal/domain"
+	"github.com/octokerbs/chronocode-backend/internal/application"
 )
 
 // Creado para que la aplicacion orquestee el dominio sin saber que Code Host debe crear.
@@ -14,6 +14,6 @@ func NewGithubFactory() *GithubFactory {
 	return &GithubFactory{}
 }
 
-func (f *GithubFactory) Create(ctx context.Context, accessToken string) (domain.CodeHost, error) {
+func (f *GithubFactory) Create(ctx context.Context, accessToken string) (application.CodeHost, error) {
 	return NewGithubClient(ctx, accessToken)
 }

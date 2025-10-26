@@ -1,17 +1,17 @@
-package handler
+package api
 
 import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/octokerbs/chronocode-backend/internal/usecase"
+	"github.com/octokerbs/chronocode-backend/internal/application"
 )
 
 type AnalysisHandler struct {
-	repoAnalyzer *usecase.RepositoryAnalyzer
+	repoAnalyzer *application.RepositoryAnalyzer
 }
 
-func NewAnalysisHandler(repoAnalyzer *usecase.RepositoryAnalyzer) *AnalysisHandler {
+func NewAnalysisHandler(repoAnalyzer *application.RepositoryAnalyzer) *AnalysisHandler {
 	return &AnalysisHandler{repoAnalyzer}
 }
 

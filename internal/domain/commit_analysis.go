@@ -9,19 +9,6 @@ type CommitAnalysis struct {
 	Subcommits []Subcommit `json:"subcommits"`
 }
 
-type Commit struct {
-	Description string `json:"description"`
-}
-
-type Subcommit struct {
-	Title       string   `json:"title"`
-	Idea        string   `json:"idea"`
-	Description string   `json:"description"`
-	Type        string   `json:"type"`
-	Epic        string   `json:"epic"`
-	Files       []string `json:"files"`
-}
-
 func UnmarshalCommitAnalysisSchemaOntoStruct(text []byte) (CommitAnalysis, error) {
 	analysis := &CommitAnalysis{
 		Commit:     Commit{},

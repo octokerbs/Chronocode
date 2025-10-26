@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/github"
+	"github.com/octokerbs/chronocode-backend/internal/domain"
 	"golang.org/x/oauth2"
 )
 
@@ -68,17 +69,17 @@ func parseRepoURL(repoURL string) (string, string, error) {
 	return pathParts[0], repoName, nil
 }
 
-func (g *GithubClient) ProduceCommits(ctx context.Context, repoURL string, lastAnalyzedCommitSHA string, commits chan<- string, errors chan<- string) {
-	repository, err := getRepository(ctx, g.client, repoURL)
+func (gc *GithubClient) ProduceCommits(ctx context.Context, repoURL string, lastAnalyzedCommitSHA string, commits chan<- string, errors chan<- string) {
+	repository, err := getRepository(ctx, gc.client, repoURL)
 	if err != nil {
 		errors <- fmt.Sprintf("error finding repository: %v", err.Error())
 		return
 	}
 
-	g.options.SHA = lastAnalyzedCommitSHA
+	gc.options.SHA = lastAnalyzedCommitSHA
 
 	for {
-		pageCommits, resp, err := g.client.Repositories.ListCommits(ctx, *repository.Owner.Login, *repository.Name, g.options)
+		pageCommits, resp, err := gc.client.Repositories.ListCommits(ctx, *repository.Owner.Login, *repository.Name, gc.options)
 		if err != nil {
 			errors <- fmt.Sprintf("error fetching commits: %v", err.Error())
 			return
@@ -92,17 +93,17 @@ func (g *GithubClient) ProduceCommits(ctx context.Context, repoURL string, lastA
 			break
 		}
 
-		g.options.ListOptions.Page = resp.NextPage
+		gc.options.ListOptions.Page = resp.NextPage
 	}
 }
 
-func (g *GithubClient) GetCommitDiff(ctx context.Context, repoURL string, commitSHA string) (string, error) {
-	repository, err := getRepository(ctx, g.client, repoURL)
+func (gc *GithubClient) GetCommitDiff(ctx context.Context, repoURL string, commitSHA string) (string, error) {
+	repository, err := getRepository(ctx, gc.client, repoURL)
 	if err != nil {
 		return "", err
 	}
 
-	commitFullData, _, err := g.client.Repositories.GetCommit(ctx, *repository.Owner.Login, *repository.Name, commitSHA) // Github api doesn't fetch the file data when fetching repo commits. We have to do it ourselves.
+	commitFullData, _, err := gc.client.Repositories.GetCommit(ctx, *repository.Owner.Login, *repository.Name, commitSHA) // Github api doesn't fetch the file data when fetching repo commits. We have to do it ourselves.
 	if err != nil {
 		return "", fmt.Errorf("error fetching commit %s: %v", commitSHA, err)
 	}
@@ -119,8 +120,8 @@ func (g *GithubClient) GetCommitDiff(ctx context.Context, repoURL string, commit
 	return diff, nil
 }
 
-func (g *GithubClient) RepositoryID(ctx context.Context, repoURL string) (int64, error) {
-	repository, err := getRepository(ctx, g.client, repoURL)
+func (gc *GithubClient) RepositoryID(ctx context.Context, repoURL string) (int64, error) {
+	repository, err := getRepository(ctx, gc.client, repoURL)
 	if err != nil {
 		return 0, err
 	}
@@ -128,40 +129,43 @@ func (g *GithubClient) RepositoryID(ctx context.Context, repoURL string) (int64,
 	return *repository.ID, nil
 }
 
-func (g *GithubClient) GetRepositoryData(ctx context.Context, repoURL string) (map[string]interface{}, error) {
-	repository, err := getRepository(ctx, g.client, repoURL)
+func (gc *GithubClient) NewRepository(ctx context.Context, repoURL string) (*domain.Repository, error) {
+	repository, err := getRepository(ctx, gc.client, repoURL)
 	if err != nil {
 		return nil, err
 	}
 
-	return map[string]interface{}{
-		"id":   *repository.ID,
-		"name": *repository.FullName,
-		"url":  *repository.HTMLURL,
+	return &domain.Repository{
+		ID:                 *repository.ID,
+		Name:               *repository.FullName,
+		URL:                *repository.HTMLURL,
+		LastAnalyzedCommit: "",
 	}, nil
 }
 
-func (g *GithubClient) GetCommitData(ctx context.Context, repoURL string, commitSHA string) (map[string]interface{}, error) {
-	repository, err := getRepository(ctx, g.client, repoURL)
+func (gc *GithubClient) NewCommit(ctx context.Context, repoURL string, commitSHA string) (*domain.Commit, error) {
+	repository, err := getRepository(ctx, gc.client, repoURL)
 	if err != nil {
 		return nil, err
 	}
 
-	commit, _, _ := g.client.Repositories.GetCommit(ctx, *repository.Owner.Login, *repository.Name, commitSHA)
+	commit, _, _ := gc.client.Repositories.GetCommit(ctx, *repository.Owner.Login, *repository.Name, commitSHA)
 
 	files := []string{}
 	for _, file := range commit.Files {
 		files = append(files, *file.Filename)
 	}
 
-	return map[string]interface{}{
-		"author":        *commit.Commit.Author.Name,
-		"author_email":  *commit.Commit.Author.Email,
-		"author_url":    *commit.Committer.HTMLURL,
-		"date":          commit.Commit.Author.Date.Format(time.RFC3339),
-		"message":       *commit.Commit.Message,
-		"url":           *commit.HTMLURL,
-		"files":         files,
-		"repository_id": *repository.ID,
+	return &domain.Commit{
+		SHA:         commitSHA,
+		Author:      *commit.Commit.Author.Name,
+		Date:        commit.Commit.Author.Date.Format(time.RFC3339),
+		Message:     *commit.Commit.Message,
+		URL:         *commit.HTMLURL,
+		AuthorEmail: *commit.Commit.Author.Email,
+		Description: "",
+		AuthorURL:   *commit.Committer.HTMLURL,
+		Files:       files,
+		RepoID:      *repository.ID,
 	}, nil
 }
