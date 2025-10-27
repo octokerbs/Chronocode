@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -10,11 +11,10 @@ import (
 	"github.com/octokerbs/chronocode-backend/internal/application"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/agent/gemini"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/codehost/githubapi"
-	"github.com/octokerbs/chronocode-backend/internal/infrastructure/database/mock"
+	"github.com/octokerbs/chronocode-backend/internal/infrastructure/database/postgres"
 )
 
 func main() {
-
 	// Load env variables
 	_ = godotenv.Load()
 
@@ -29,15 +29,14 @@ func main() {
 
 	githubFactory := githubapi.NewGithubFactory()
 
-	// pgClient, err := postgres.NewPostgresClient(ctx, os.Getenv("POSTGRES_DSN"))
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	mockPostgresClient := &mock.PostgresMock{}
+	dsn := fmt.Sprintf("postgres://%s:%s@localhost:5432/%s", os.Getenv("POSTGRES_USER"), os.Getenv("POSTGRES_PASSWORD"), os.Getenv("POSTGRES_DB"))
+	pgClient, err := postgres.NewPostgresClient(ctx, dsn)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create the application entities
-	repoAnalyzer := application.NewRepositoryAnalyzer(ctx, geminiClient, githubFactory, mockPostgresClient)
+	repoAnalyzer := application.NewRepositoryAnalyzer(ctx, geminiClient, githubFactory, pgClient)
 
 	// Launch server
 	server, err := NewServer(":8080", repoAnalyzer)

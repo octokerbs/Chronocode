@@ -165,25 +165,19 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(ctx context.Context, codeHost
 		}
 
 		commit.Description = analysis.Commit.Description
+		records <- commit
 
 		subcommits := analysis.Subcommits
 		for i := range subcommits {
 			subcommits[i].CommitSHA = commitSHA
+			records <- &subcommits[i]
 		}
 
-		ra.saveCommitAnalysis(commit, subcommits, records)
-
+		// TODO: Remover para acelerar el proceso, solo esta para debugging
 		ra.analyzedCommitsMutex.Lock()
 		ra.AnalyzedCommits = append(ra.AnalyzedCommits, *commit)
 		ra.AnalyzerSubcommits = append(ra.AnalyzerSubcommits, subcommits...)
 		ra.analyzedCommitsMutex.Unlock()
-	}
-}
-
-func (ra *RepositoryAnalyzer) saveCommitAnalysis(commit *domain.Commit, subcommits []domain.Subcommit, records chan<- DatabaseRecord) {
-	records <- commit
-	for _, subcommit := range subcommits {
-		records <- &subcommit
 	}
 }
 

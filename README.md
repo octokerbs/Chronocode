@@ -12,7 +12,9 @@ This is a port of a project made for the [ShipBA Hackaton 2025](https://www.ship
 ## ENV file setup
 ```env
 GEMINI_API_KEY=
-POSTGRES_DSN=
+POSTGRES_DB=
+POSTGRES_USER=
+POSTGRES_PASSWORD=
 ```
 
 ## Dependency installation
