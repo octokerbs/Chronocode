@@ -15,5 +15,3 @@ type Subcommit struct {
 	Epic        string
 	Files       []string
 }
-
-func (s *Subcommit) IsDatabaseRecord() {}

@@ -17,5 +17,3 @@ type Commit struct {
 	Files       []string
 	RepoID      int64
 }
-
-func (c *Commit) IsDatabaseRecord() {}

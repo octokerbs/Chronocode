@@ -11,5 +11,3 @@ type Repository struct {
 	URL                string
 	LastAnalyzedCommit string
 }
-
-func (r *Repository) IsDatabaseRecord() {}

@@ -1,7 +1,11 @@
 package api
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/octokerbs/chronocode-backend/internal/application"
@@ -17,7 +21,18 @@ func NewAnalysisHandler(repoAnalyzer *application.RepositoryAnalyzer) *AnalysisH
 
 func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 	repoURL := c.Query("repo_url")
-	accessToken := c.Query("access_token")
+
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Authorization header is required"})
+		return
+	}
+
+	var accessToken string
+	if _, err := fmt.Sscanf(authHeader, "Bearer %s", &accessToken); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid Authorization header format"})
+		return
+	}
 
 	if repoURL == "" || accessToken == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -27,26 +42,19 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		return
 	}
 
-	commits, subcommits, errors, err := h.repoAnalyzer.AnalyzeRepository(c.Request.Context(), repoURL, accessToken)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": err.Error(),
-		})
-		return
-	}
+	go func() {
+		analysisCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
 
-	advisory := ""
-	if len(commits) > 20 {
-		advisory = "Not all commits were analyzed due to repository analysis limit reached"
-	}
+		if err := h.repoAnalyzer.AnalyzeRepository(analysisCtx, repoURL, accessToken); err != nil {
+			log.Printf("Background analysis failed for %s: %v", repoURL, err)
+		} else {
+			log.Printf("Background analysis complete for %s", repoURL)
+		}
+	}()
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":         "success",
-		"analyses_count": len(commits),
-		"commits":        commits,
-		"subcommits":     subcommits,
-		"advisory":       advisory,
-		"errors":         errors,
+	c.JSON(http.StatusAccepted, gin.H{
+		"status":  "pending",
+		"message": "Repository analysis has been queued.",
 	})
 }

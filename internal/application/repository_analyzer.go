@@ -2,128 +2,82 @@ package application
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/octokerbs/chronocode-backend/internal/domain"
 )
 
-// CodeHost is the service that allocates our code and gives us access to different aspects of it
-type CodeHostFactory interface {
-	Create(ctx context.Context, accessToken string) (CodeHost, error)
-}
-
-type CodeHost interface {
-	NewRepository(ctx context.Context, repoURL string) (*domain.Repository, error)
-	NewCommit(ctx context.Context, repoURL string, commitSHA string) (*domain.Commit, error)
-
-	ProduceCommits(ctx context.Context, repoURL string, lastAnalyzedCommitSHA string, commits chan<- string, errors chan<- string)
-	GetCommitDiff(ctx context.Context, repoURL string, commitSHA string) (string, error)
-
-	RepositoryID(ctx context.Context, repoURL string) (int64, error)
-}
-
-// Agent is the LLM that we use to process our commits giving us descriptions and generating subcommits
-type Agent interface {
-	AnalyzeDiff(ctx context.Context, diff string) (domain.CommitAnalysis, error)
-}
-
-// Database is where we store our repositories, commit data and subcommit data.
-type Database interface {
-	InsertRepositoryRecord(ctx context.Context, repo *domain.Repository) error
-	InsertCommitRecord(ctx context.Context, commit *domain.Commit) error
-	InsertSubcommitRecord(ctx context.Context, subcommit *domain.Subcommit) error
-
-	GetRepository(ctx context.Context, id int64) (*domain.Repository, bool, error)
-	ProcessRecords(ctx context.Context, records <-chan DatabaseRecord, errors chan<- string)
-}
-
-type DatabaseRecord interface {
-	IsDatabaseRecord()
-}
-
-// RepositoryAnalyzer fetches our repo and gives us an analysis on all the commits, generating also the subcommits.
-// This is our principal orquestator for the app.
 type RepositoryAnalyzer struct {
-	Agent           Agent
-	CodeHostFactory CodeHostFactory
-	Database        Database
+	Agent           domain.Agent
+	CodeHostFactory domain.CodeHostFactory
+	Database        domain.Database
 
-	AnalyzedCommits      []domain.Commit
-	AnalyzerSubcommits   []domain.Subcommit
-	analyzedCommitsMutex sync.Mutex
+	resultsMutex       sync.Mutex
+	analyzedCommits    []*domain.Commit
+	analyzedSubcommits []*domain.Subcommit
 }
 
-func NewRepositoryAnalyzer(ctx context.Context, agent Agent, factory CodeHostFactory, database Database) *RepositoryAnalyzer {
+func NewRepositoryAnalyzer(ctx context.Context, agent domain.Agent, codehostFactory domain.CodeHostFactory, database domain.Database) *RepositoryAnalyzer {
 	return &RepositoryAnalyzer{
 		Agent:              agent,
-		CodeHostFactory:    factory,
+		CodeHostFactory:    codehostFactory,
 		Database:           database,
-		AnalyzedCommits:    []domain.Commit{},
-		AnalyzerSubcommits: []domain.Subcommit{},
+		analyzedCommits:    []*domain.Commit{},
+		analyzedSubcommits: []*domain.Subcommit{},
 	}
 }
 
-func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL string, accessToken string) ([]domain.Commit, []domain.Subcommit, []string, error) {
-	codeHost, err := ra.CodeHostFactory.Create(ctx, accessToken)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create GitHub client: %w", err)
-	}
+func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL string, accessToken string) error {
+	codeHost := ra.CodeHostFactory.Create(ctx, accessToken)
 
 	commits := make(chan string)
-	records := make(chan DatabaseRecord)
-	errors := make(chan string)
 
-	repo, err := getOrCreateRepositoryRecord(ctx, repoURL, ra.Database, codeHost)
+	repo, err := ra.fetchOrCreateRepository(ctx, repoURL, codeHost)
 	if err != nil {
-		return nil, nil, nil, err
+		return err
 	}
 
-	// Set up workers
-	go func() {
-		var wg sync.WaitGroup
-		for range 200 {
-			wg.Add(1)
-			go ra.commitAnalyzerWorker(ctx, codeHost, repoURL, commits, records, &wg, errors)
-		}
-		wg.Wait()
-		close(records)
-	}()
+	// Clear slices from any previous run
+	ra.analyzedCommits = nil
+	ra.analyzedSubcommits = nil
 
-	go func() {
-		var wg sync.WaitGroup
-		for range 500 {
-			wg.Add(1)
-			go ra.databaseInserterWorker(ctx, records, &wg, errors)
-		}
-		wg.Wait()
-		close(errors)
-	}()
+	var wg sync.WaitGroup
+	for range 200 {
+		wg.Add(1)
+		go ra.commitAnalyzerWorker(ctx, repoURL, codeHost, commits, &wg)
+	}
 
 	lastAnalyzedCommitSHA := repo.LastAnalyzedCommit
 
-	// Start pipeline
 	go func() {
-		codeHost.ProduceCommits(ctx, repoURL, lastAnalyzedCommitSHA, commits, errors)
-		close(commits)
+		// When ProduceCommits is done, it will close the channel
+		codeHost.ProduceCommitSHAs(ctx, repoURL, lastAnalyzedCommitSHA, commits)
 	}()
 
-	// Collect errors
-	errorsSlice := []string{}
-	for e := range errors {
-		errorsSlice = append(errorsSlice, e)
+	wg.Wait()
+
+	if len(ra.analyzedCommits) > 0 {
+		if err := ra.Database.StoreCommits(ctx, ra.analyzedCommits); err != nil {
+			return err
+		}
 	}
 
-	return ra.AnalyzedCommits, ra.AnalyzerSubcommits, errorsSlice, nil
+	if len(ra.analyzedSubcommits) > 0 {
+		if err := ra.Database.StoreSubcommits(ctx, ra.analyzedSubcommits); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func getOrCreateRepositoryRecord(ctx context.Context, repoURL string, database Database, codeHost CodeHost) (*domain.Repository, error) {
-	id, err := codeHost.RepositoryID(ctx, repoURL)
+func (ra *RepositoryAnalyzer) fetchOrCreateRepository(ctx context.Context, repoURL string, codeHost domain.CodeHost) (*domain.Repository, error) {
+	id, err := codeHost.FetchRepositoryID(ctx, repoURL)
 	if err != nil {
 		return nil, err
 	}
 
-	repo, ok, err := database.GetRepository(ctx, id)
+	repo, ok, err := ra.Database.GetRepository(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -132,56 +86,48 @@ func getOrCreateRepositoryRecord(ctx context.Context, repoURL string, database D
 		return repo, nil
 	}
 
-	repo, err = codeHost.NewRepository(ctx, repoURL)
+	repo, err = codeHost.FetchRepository(ctx, repoURL)
 	if err != nil {
 		return nil, err
 	}
 
-	database.InsertRepositoryRecord(ctx, repo)
+	ra.Database.StoreRepository(ctx, repo)
 
 	return repo, nil
 }
 
-func (ra *RepositoryAnalyzer) commitAnalyzerWorker(ctx context.Context, codeHost CodeHost, repoURL string, commits <-chan string, records chan<- DatabaseRecord, wg *sync.WaitGroup, errors chan<- string) {
+func (ra *RepositoryAnalyzer) commitAnalyzerWorker(ctx context.Context, repoURL string, codeHost domain.CodeHost, commits <-chan string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for commitSHA := range commits {
-		diff, err := codeHost.GetCommitDiff(ctx, repoURL, commitSHA)
+		diff, err := codeHost.FetchCommitDiff(ctx, repoURL, commitSHA)
 		if err != nil {
-			errors <- fmt.Sprintf("commit diff failed: %s", err.Error())
 			continue
 		}
 
-		analysis, err := ra.Agent.AnalyzeDiff(ctx, diff)
+		analysis, err := ra.Agent.AnalyzeCommitDiff(ctx, diff)
 		if err != nil {
-			errors <- fmt.Sprintf("error unmarshaling response: %s", err.Error())
 			continue
 		}
 
-		commit, err := codeHost.NewCommit(ctx, repoURL, commitSHA)
+		commit, err := codeHost.FetchCommit(ctx, repoURL, commitSHA)
 		if err != nil {
-			errors <- fmt.Sprintf("error creating commit record: %s", err.Error())
 			continue
 		}
 
 		commit.Description = analysis.Commit.Description
-		records <- commit
 
 		subcommits := analysis.Subcommits
 		for i := range subcommits {
 			subcommits[i].CommitSHA = commitSHA
-			records <- &subcommits[i]
 		}
 
-		// TODO: Remover para acelerar el proceso, solo esta para debugging
-		ra.analyzedCommitsMutex.Lock()
-		ra.AnalyzedCommits = append(ra.AnalyzedCommits, *commit)
-		ra.AnalyzerSubcommits = append(ra.AnalyzerSubcommits, subcommits...)
-		ra.analyzedCommitsMutex.Unlock()
+		ra.resultsMutex.Lock()
+		ra.analyzedCommits = append(ra.analyzedCommits, commit)
+		for i := range subcommits {
+			sc := subcommits[i]
+			ra.analyzedSubcommits = append(ra.analyzedSubcommits, &sc)
+		}
+		ra.resultsMutex.Unlock()
 	}
-}
-
-func (ra *RepositoryAnalyzer) databaseInserterWorker(ctx context.Context, records <-chan DatabaseRecord, wg *sync.WaitGroup, errors chan<- string) {
-	defer wg.Done()
-	ra.Database.ProcessRecords(ctx, records, errors)
 }
