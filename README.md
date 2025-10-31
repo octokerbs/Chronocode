@@ -17,14 +17,9 @@ POSTGRES_USER=
 POSTGRES_PASSWORD=
 ```
 
-## Dependency installation
+## Run
 ```bash
-go mod tidy
-```
-
-## Run server
-```bash
-go run cmd/chronocode/server.go
+docker compose up
 ```
 
 ## Example
