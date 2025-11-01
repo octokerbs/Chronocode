@@ -141,7 +141,13 @@ func (d *Database) StoreCommits(ctx context.Context, commits []*domain.Commit) e
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+
+	for _, commit := range commits {
+		d.StoreSubcommits(ctx, commit.Subcommits)
+	}
+
+	return err
 }
 
 func (d *Database) StoreSubcommits(ctx context.Context, subcommits []*domain.Subcommit) error {

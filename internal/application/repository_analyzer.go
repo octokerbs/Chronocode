@@ -12,18 +12,16 @@ type RepositoryAnalyzer struct {
 	CodeHostFactory domain.CodeHostFactory
 	Database        domain.Database
 
-	resultsMutex       sync.Mutex
-	analyzedCommits    []*domain.Commit
-	analyzedSubcommits []*domain.Subcommit
+	resultsMutex    sync.Mutex
+	analyzedCommits []*domain.Commit
 }
 
 func NewRepositoryAnalyzer(ctx context.Context, agent domain.Agent, codehostFactory domain.CodeHostFactory, database domain.Database) *RepositoryAnalyzer {
 	return &RepositoryAnalyzer{
-		Agent:              agent,
-		CodeHostFactory:    codehostFactory,
-		Database:           database,
-		analyzedCommits:    []*domain.Commit{},
-		analyzedSubcommits: []*domain.Subcommit{},
+		Agent:           agent,
+		CodeHostFactory: codehostFactory,
+		Database:        database,
+		analyzedCommits: []*domain.Commit{},
 	}
 }
 
@@ -39,7 +37,6 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL str
 
 	// Clear slices from any previous run
 	ra.analyzedCommits = nil
-	ra.analyzedSubcommits = nil
 
 	var wg sync.WaitGroup
 	for range 200 {
@@ -58,12 +55,6 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL str
 
 	if len(ra.analyzedCommits) > 0 {
 		if err := ra.Database.StoreCommits(ctx, ra.analyzedCommits); err != nil {
-			return err
-		}
-	}
-
-	if len(ra.analyzedSubcommits) > 0 {
-		if err := ra.Database.StoreSubcommits(ctx, ra.analyzedSubcommits); err != nil {
 			return err
 		}
 	}
@@ -115,19 +106,10 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(ctx context.Context, repoURL 
 			continue
 		}
 
-		commit.Description = analysis.Commit.Description
-
-		subcommits := analysis.Subcommits
-		for i := range subcommits {
-			subcommits[i].CommitSHA = commitSHA
-		}
+		commit.ApplyAnalysis(&analysis)
 
 		ra.resultsMutex.Lock()
 		ra.analyzedCommits = append(ra.analyzedCommits, commit)
-		for i := range subcommits {
-			sc := subcommits[i]
-			ra.analyzedSubcommits = append(ra.analyzedSubcommits, &sc)
-		}
 		ra.resultsMutex.Unlock()
 	}
 }

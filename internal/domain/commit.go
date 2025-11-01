@@ -16,4 +16,14 @@ type Commit struct {
 	AuthorURL   string
 	Files       []string
 	RepoID      int64
+	Subcommits  []*Subcommit
+}
+
+func (c *Commit) ApplyAnalysis(analysis *CommitAnalysis) {
+	c.Description = analysis.Commit.Description
+
+	subcommits := analysis.Subcommits
+	for i := range subcommits {
+		subcommits[i].ApplyAnalysis(c.SHA)
+	}
 }

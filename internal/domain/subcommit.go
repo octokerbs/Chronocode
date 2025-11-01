@@ -15,3 +15,7 @@ type Subcommit struct {
 	Epic        string
 	Files       []string
 }
+
+func (s *Subcommit) ApplyAnalysis(commitSHA string) {
+	s.CommitSHA = commitSHA
+}

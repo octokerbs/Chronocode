@@ -9,5 +9,4 @@ type Database interface {
 
 	StoreRepository(ctx context.Context, repo *Repository) error
 	StoreCommits(ctx context.Context, commits []*Commit) error
-	StoreSubcommits(ctx context.Context, subcommits []*Subcommit) error
 }
