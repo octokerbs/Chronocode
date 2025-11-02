@@ -59,7 +59,7 @@ func (ra *RepositoryAnalyzer) RunAnalysis(ctx context.Context, repo *domain.Repo
 
 	ra.cleanCommits()
 
-	commits := make(chan string)
+	commitSHAs := make(chan string)
 	var wg sync.WaitGroup
 	const numWorkers = 200
 	log.Info("Starting commit analysis workers", "workerCount", numWorkers)
@@ -67,12 +67,12 @@ func (ra *RepositoryAnalyzer) RunAnalysis(ctx context.Context, repo *domain.Repo
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		workerLog := log.With("workerID", i)
-		go ra.commitAnalyzerWorker(ctx, repo.URL, codeHost, commits, &wg, workerLog)
+		go ra.commitAnalyzerWorker(ctx, repo.URL, codeHost, commitSHAs, &wg, workerLog)
 	}
 
 	go func() {
 		log.Info("Starting commit SHA producer")
-		codeHost.ProduceCommitSHAs(ctx, repo.URL, repo.LastAnalyzedCommit, commits)
+		codeHost.ProduceCommitSHAs(ctx, repo.URL, repo.LastAnalyzedCommit, commitSHAs)
 		log.Info("Commit SHA producer finished")
 	}()
 
@@ -145,7 +145,7 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(
 	ctx context.Context,
 	repoURL string,
 	codeHost domain.CodeHost,
-	commits <-chan string,
+	commitSHAs <-chan string,
 	wg *sync.WaitGroup,
 	log Logger,
 ) {
@@ -153,7 +153,7 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(
 		wg.Done()
 	}()
 
-	for commitSHA := range commits {
+	for commitSHA := range commitSHAs {
 		commitLog := log.With("commitSHA", commitSHA)
 
 		diff, err := codeHost.FetchCommitDiff(ctx, repoURL, commitSHA)
