@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/octokerbs/chronocode-backend/internal/api/httperror"
 	"github.com/octokerbs/chronocode-backend/internal/application"
 )
 
@@ -47,7 +48,7 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		defer cancel()
 
 		if err := h.repoAnalyzer.AnalyzeRepository(analysisCtx, repoURL, accessToken); err != nil {
-			log.Printf("Background analysis failed for %s: %v", repoURL, err)
+			log.Printf("Background analysis failed for %s: %v", repoURL, httperror.FromError(err))
 		} else {
 			log.Printf("Background analysis complete for %s", repoURL)
 		}

@@ -37,12 +37,12 @@ func (a *Agent) AnalyzeCommitDiff(ctx context.Context, diff string) (domain.Comm
 	}
 
 	if err != nil {
-		return domain.CommitAnalysis{}, err
+		return domain.CommitAnalysis{}, domain.NewError(domain.ErrInternalFailure, err)
 	}
 
 	var analysis domain.CommitAnalysis
 	if err := json.Unmarshal(text, &analysis); err != nil {
-		return domain.CommitAnalysis{}, err
+		return domain.CommitAnalysis{}, domain.NewError(domain.ErrInternalFailure, err)
 	}
 
 	return analysis, nil

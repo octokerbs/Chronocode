@@ -2,6 +2,7 @@ package githubapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -25,7 +26,7 @@ func NewGithubCodeHost(ctx context.Context, accessToken string) *CodeHost {
 func (ch *CodeHost) FetchRepository(ctx context.Context, repoURL string) (*domain.Repository, error) {
 	githubRepository, err := ch.github.fetchRepository(ctx, repoURL)
 	if err != nil {
-		return nil, err
+		return nil, ch.translateGithubError(err)
 	}
 
 	now := time.Now()
@@ -44,7 +45,7 @@ func (ch *CodeHost) FetchRepository(ctx context.Context, repoURL string) (*domai
 func (ch *CodeHost) FetchRepositoryID(ctx context.Context, repoURL string) (int64, error) {
 	githubRepository, err := ch.github.fetchRepository(ctx, repoURL)
 	if err != nil {
-		return 0, err
+		return 0, ch.translateGithubError(err)
 	}
 
 	return *githubRepository.ID, nil
@@ -53,7 +54,7 @@ func (ch *CodeHost) FetchRepositoryID(ctx context.Context, repoURL string) (int6
 func (ch *CodeHost) FetchCommit(ctx context.Context, repoURL string, commitSHA string) (*domain.Commit, error) {
 	githubCommit, err := ch.github.fetchCommit(ctx, repoURL, commitSHA)
 	if err != nil {
-		return nil, err
+		return nil, ch.translateGithubError(err)
 	}
 
 	files := []string{}
@@ -63,7 +64,7 @@ func (ch *CodeHost) FetchCommit(ctx context.Context, repoURL string, commitSHA s
 
 	repoID, err := ch.FetchRepositoryID(ctx, repoURL)
 	if err != nil {
-		return nil, err
+		return nil, ch.translateGithubError(err)
 	}
 	log.Printf("Fetched repo id: %v", repoID)
 
@@ -87,7 +88,7 @@ func (ch *CodeHost) FetchCommit(ctx context.Context, repoURL string, commitSHA s
 func (ch *CodeHost) FetchCommitDiff(ctx context.Context, repoURL string, commitSHA string) (string, error) {
 	githubCommit, err := ch.github.fetchCommit(ctx, repoURL, commitSHA)
 	if err != nil {
-		return "", err
+		return "", ch.translateGithubError(err)
 	}
 
 	diff := ""
@@ -128,6 +129,26 @@ func (ch *CodeHost) ProduceCommitSHAs(ctx context.Context, repoURL string, lastA
 	}
 
 	close(commits)
+}
+
+func (ch *CodeHost) translateGithubError(err error) error {
+	var githubErr *github.ErrorResponse
+	if errors.As(err, &githubErr) {
+		switch githubErr.Response.StatusCode {
+		case 404:
+			return domain.ErrNotFound
+		case 401, 403:
+			return domain.ErrUnauthorized
+		default:
+			return domain.NewError(domain.ErrInternalFailure, err)
+		}
+	}
+
+	if errors.Is(err, domain.ErrInvalidURL) || errors.Is(err, domain.ErrNotSupported) {
+		return domain.NewError(domain.ErrBadRequest, err)
+	}
+
+	return domain.NewError(domain.ErrInternalFailure, err)
 }
 
 type githubClient struct {
@@ -172,12 +193,12 @@ func (gc *githubClient) parseRepoURL(repoURL string) (string, string, error) {
 	}
 
 	if parsedURL.Host != "github.com" {
-		return "", "", fmt.Errorf("not supported version control repository")
+		return "", "", fmt.Errorf("url '%s' is not github.com: %w", repoURL, domain.ErrNotSupported)
 	}
 
 	pathParts := strings.Split(strings.TrimPrefix(parsedURL.Path, "/"), "/")
 	if len(pathParts) < 2 {
-		return "", "", fmt.Errorf("invalid GitHub repository URL format")
+		return "", "", fmt.Errorf("url '%s' has invalid path: %w", repoURL, domain.ErrInvalidURL)
 	}
 
 	repoName := strings.TrimSuffix(pathParts[1], ".git")
