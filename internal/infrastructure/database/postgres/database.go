@@ -26,7 +26,7 @@ func NewPostgresDatabase(connectionString string) (*Database, error) {
 func (d *Database) GetRepository(ctx context.Context, id int64) (*domain.Repository, bool, error) {
 	const query = `
 		SELECT id, created_at, name, url, last_analyzed_commit
-		FROM repositories
+		FROM repository
 		WHERE id = $1`
 
 	repo := &domain.Repository{}
@@ -52,45 +52,24 @@ func (d *Database) GetRepository(ctx context.Context, id int64) (*domain.Reposit
 }
 
 func (d *Database) StoreRepository(ctx context.Context, repo *domain.Repository) error {
-	if repo.ID == 0 {
-		const insertQuery = `
-			INSERT INTO repositories (created_at, name, url, last_analyzed_commit)
-			VALUES ($1, $2, $3, $4)
-			RETURNING id`
+	const upsertQuery = `
+        INSERT INTO repository (id, created_at, name, url, last_analyzed_commit)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (id) DO UPDATE SET
+            created_at = EXCLUDED.created_at,
+            name = EXCLUDED.name,
+            url = EXCLUDED.url,
+            last_analyzed_commit = EXCLUDED.last_analyzed_commit`
 
-		err := d.postgres.DB.QueryRowContext(ctx, insertQuery,
-			repo.CreatedAt,
-			repo.Name,
-			repo.URL,
-			repo.LastAnalyzedCommit,
-		).Scan(&repo.ID)
-
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-
-	const updateQuery = `
-		UPDATE repositories
-		SET created_at = $1,
-		    name = $2,
-		    url = $3,
-		    last_analyzed_commit = $4
-		WHERE id = $5`
-
-	_, err := d.postgres.DB.ExecContext(ctx, updateQuery,
+	_, err := d.postgres.DB.ExecContext(ctx, upsertQuery,
+		repo.ID,
 		repo.CreatedAt,
 		repo.Name,
 		repo.URL,
 		repo.LastAnalyzedCommit,
-		repo.ID,
 	)
 
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (d *Database) StoreCommits(ctx context.Context, commits []*domain.Commit) error {
@@ -109,24 +88,15 @@ func (d *Database) StoreCommits(ctx context.Context, commits []*domain.Commit) e
 		"author_email", "description", "author_url", "files", "repo_id",
 	}
 
-	stmt, err := tx.Prepare(pq.CopyIn("commits", columns...))
+	stmt, err := tx.Prepare(pq.CopyIn("commit", columns...))
 	if err != nil {
 		return err
 	}
 
 	for _, c := range commits {
 		_, err = stmt.Exec(
-			c.SHA,
-			c.CreatedAt,
-			c.Author,
-			c.Date,
-			c.Message,
-			c.URL,
-			c.AuthorEmail,
-			c.Description,
-			c.AuthorURL,
-			pq.Array(c.Files),
-			c.RepoID,
+			c.SHA, c.CreatedAt, c.Author, c.Date, c.Message, c.URL,
+			c.AuthorEmail, c.Description, c.AuthorURL, pq.Array(c.Files), c.RepoID,
 		)
 		if err != nil {
 			return err
@@ -141,46 +111,34 @@ func (d *Database) StoreCommits(ctx context.Context, commits []*domain.Commit) e
 		return err
 	}
 
-	err = tx.Commit()
-
 	for _, commit := range commits {
-		d.StoreSubcommits(ctx, commit.Subcommits)
+		if err := d.StoreSubcommits(ctx, tx, commit.Subcommits); err != nil {
+			return err
+		}
 	}
 
-	return err
+	return tx.Commit()
 }
 
-func (d *Database) StoreSubcommits(ctx context.Context, subcommits []*domain.Subcommit) error {
+func (d *Database) StoreSubcommits(ctx context.Context, tx *sql.Tx, subcommits []*domain.Subcommit) error {
 	if len(subcommits) == 0 {
 		return nil
 	}
-
-	tx, err := d.postgres.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 
 	columns := []string{
 		"created_at", "title", "idea", "description",
 		"commit_sha", "type", "epic", "files",
 	}
 
-	stmt, err := tx.Prepare(pq.CopyIn("subcommits", columns...))
+	stmt, err := tx.Prepare(pq.CopyIn("subcommit", columns...))
 	if err != nil {
 		return err
 	}
 
 	for _, sc := range subcommits {
 		_, err = stmt.Exec(
-			sc.CreatedAt,
-			sc.Title,
-			sc.Idea,
-			sc.Description,
-			sc.CommitSHA,
-			sc.Type,
-			sc.Epic,
-			pq.Array(sc.Files),
+			sc.CreatedAt, sc.Title, sc.Idea, sc.Description,
+			sc.CommitSHA, sc.Type, sc.Epic, pq.Array(sc.Files),
 		)
 		if err != nil {
 			return err
@@ -195,7 +153,7 @@ func (d *Database) StoreSubcommits(ctx context.Context, subcommits []*domain.Sub
 		return err
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 type postgresClient struct {

@@ -3,6 +3,7 @@ package githubapi
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/url"
 	"strings"
 	"time"
@@ -27,8 +28,11 @@ func (ch *CodeHost) FetchRepository(ctx context.Context, repoURL string) (*domai
 		return nil, err
 	}
 
+	now := time.Now()
+
 	repository := &domain.Repository{
 		ID:                 *githubRepository.ID,
+		CreatedAt:          &now,
 		Name:               *githubRepository.FullName,
 		URL:                *githubRepository.HTMLURL,
 		LastAnalyzedCommit: "",
@@ -61,9 +65,13 @@ func (ch *CodeHost) FetchCommit(ctx context.Context, repoURL string, commitSHA s
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("Fetched repo id: %v", repoID)
+
+	now := time.Now()
 
 	return &domain.Commit{
 		SHA:         commitSHA,
+		CreatedAt:   &now,
 		Author:      *githubCommit.Commit.Author.Name,
 		Date:        githubCommit.Commit.Author.Date.Format(time.RFC3339),
 		Message:     *githubCommit.Commit.Message,

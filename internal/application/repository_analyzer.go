@@ -17,17 +17,18 @@ type RepositoryAnalyzer struct {
 }
 
 func NewRepositoryAnalyzer(ctx context.Context, agent domain.Agent, codehostFactory domain.CodeHostFactory, database domain.Database) *RepositoryAnalyzer {
-	return &RepositoryAnalyzer{
+	ra := &RepositoryAnalyzer{
 		Agent:           agent,
 		CodeHostFactory: codehostFactory,
 		Database:        database,
 		analyzedCommits: []*domain.Commit{},
 	}
+
+	return ra
 }
 
 func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL string, accessToken string) error {
 	codeHost := ra.CodeHostFactory.Create(ctx, accessToken)
-
 	commits := make(chan string)
 
 	repo, err := ra.fetchOrCreateRepository(ctx, repoURL, codeHost)
@@ -35,8 +36,7 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL str
 		return err
 	}
 
-	// Clear slices from any previous run
-	ra.analyzedCommits = nil
+	ra.CleanCommits()
 
 	var wg sync.WaitGroup
 	for range 200 {
@@ -44,11 +44,8 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL str
 		go ra.commitAnalyzerWorker(ctx, repoURL, codeHost, commits, &wg)
 	}
 
-	lastAnalyzedCommitSHA := repo.LastAnalyzedCommit
-
 	go func() {
-		// When ProduceCommits is done, it will close the channel
-		codeHost.ProduceCommitSHAs(ctx, repoURL, lastAnalyzedCommitSHA, commits)
+		codeHost.ProduceCommitSHAs(ctx, repoURL, repo.LastAnalyzedCommit, commits) // When ProduceCommits is done, it closes the channel
 	}()
 
 	wg.Wait()
@@ -57,9 +54,18 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL str
 		if err := ra.Database.StoreCommits(ctx, ra.analyzedCommits); err != nil {
 			return err
 		}
+
+		repo.UpdateLastAnalyzedCommit(ra.analyzedCommits[len(ra.analyzedCommits)-1].SHA)
+		if err := ra.Database.StoreRepository(ctx, repo); err != nil {
+			return err
+		}
 	}
 
 	return nil
+}
+
+func (ra *RepositoryAnalyzer) CleanCommits() {
+	ra.analyzedCommits = []*domain.Commit{}
 }
 
 func (ra *RepositoryAnalyzer) fetchOrCreateRepository(ctx context.Context, repoURL string, codeHost domain.CodeHost) (*domain.Repository, error) {
@@ -82,13 +88,17 @@ func (ra *RepositoryAnalyzer) fetchOrCreateRepository(ctx context.Context, repoU
 		return nil, err
 	}
 
-	ra.Database.StoreRepository(ctx, repo)
+	if err := ra.Database.StoreRepository(ctx, repo); err != nil {
+		return nil, err
+	}
 
 	return repo, nil
 }
 
 func (ra *RepositoryAnalyzer) commitAnalyzerWorker(ctx context.Context, repoURL string, codeHost domain.CodeHost, commits <-chan string, wg *sync.WaitGroup) {
-	defer wg.Done()
+	defer func() {
+		wg.Done()
+	}()
 
 	for commitSHA := range commits {
 		diff, err := codeHost.FetchCommitDiff(ctx, repoURL, commitSHA)

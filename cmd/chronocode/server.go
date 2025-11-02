@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -25,7 +24,7 @@ func main() {
 
 	githubClient := githubapi.NewGitHubFactory()
 
-	dsn := fmt.Sprintf("postgres://%s:%s@localhost:5432/%s", os.Getenv("POSTGRES_USER"), os.Getenv("POSTGRES_PASSWORD"), os.Getenv("POSTGRES_DB"))
+	dsn := os.Getenv("DATABASE_URL") // Defined in doccker-compose.yml
 	pgClient, err := postgres.NewPostgresDatabase(dsn)
 	if err != nil {
 		panic(err)

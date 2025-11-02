@@ -11,3 +11,7 @@ type Repository struct {
 	URL                string
 	LastAnalyzedCommit string
 }
+
+func (r *Repository) UpdateLastAnalyzedCommit(commitSHA string) {
+	r.LastAnalyzedCommit = commitSHA
+}

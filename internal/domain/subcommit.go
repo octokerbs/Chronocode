@@ -16,6 +16,7 @@ type Subcommit struct {
 	Files       []string
 }
 
-func (s *Subcommit) ApplyAnalysis(commitSHA string) {
+func (s *Subcommit) ApplyAnalysis(commitSHA string, commitTimeStamp *time.Time) {
 	s.CommitSHA = commitSHA
+	s.CreatedAt = commitTimeStamp
 }

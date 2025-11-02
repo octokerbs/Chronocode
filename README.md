@@ -23,9 +23,9 @@ docker compose up
 ```
 
 ## Example
-
 ```
-http://localhost:8080/analyze-repository?repo_url=https://github.com/octokerbs/50Cent-Dolar-Blue-Bot&access_token=YourGithubApiToken
+http://localhost:8080/analyze-repository?repo_url=https://github.com/octokerbs/50Cent-Dolar-Blue-Bot
+Bearer token with your github token.
 ```
 
 ## Notes
@@ -33,3 +33,16 @@ http://localhost:8080/analyze-repository?repo_url=https://github.com/octokerbs/5
 - The performance directory is just for testing the speed of the workers pool.
 - The frontend is not currently available. 
 - We use supabase to store commits and not re-analyze them when a repo is asked to again.
+
+## Notes for me
+```bash
+docker compose up 
+```
+
+```bash
+docker compose down
+```
+
+```bash
+docker compose build
+```
