@@ -79,8 +79,6 @@ func (ra *RepositoryAnalyzer) RunAnalysis(ctx context.Context, repo *domain.Repo
 	wg.Wait()
 	log.Info("All commit analysis workers finished")
 
-	log.Info("All commit analysis workers finished")
-
 	if len(ra.analyzedCommits) == 0 {
 		log.Info("No new commits found to store")
 		return nil
@@ -121,7 +119,7 @@ func (ra *RepositoryAnalyzer) fetchOrCreateRepository(ctx context.Context, repoU
 
 	repo, err := ra.Database.GetRepository(ctx, id)
 	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
+		if errors.Is(err, domain.ErrRepositoryNotFound) {
 			log.Info("Repository not in Database, fetching from code host")
 			repo, err = codeHost.FetchRepository(ctx, repoURL)
 			if err != nil {

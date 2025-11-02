@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"strings"
 	"time"
@@ -66,7 +65,6 @@ func (ch *CodeHost) FetchCommit(ctx context.Context, repoURL string, commitSHA s
 	if err != nil {
 		return nil, ch.translateGithubError(err)
 	}
-	log.Printf("Fetched repo id: %v", repoID)
 
 	now := time.Now()
 

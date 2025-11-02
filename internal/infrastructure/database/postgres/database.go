@@ -43,7 +43,7 @@ func (d *Database) GetRepository(ctx context.Context, id int64) (*domain.Reposit
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.ErrBadRequest
+			return nil, domain.ErrRepositoryNotFound
 		}
 
 		return nil, domain.NewError(domain.ErrInternalFailure, err)

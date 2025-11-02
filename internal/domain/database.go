@@ -2,7 +2,10 @@ package domain
 
 import (
 	"context"
+	"errors"
 )
+
+var ErrRepositoryNotFound = errors.New("repository not found in database")
 
 type Database interface {
 	GetRepository(ctx context.Context, id int64) (*Repository, error)
