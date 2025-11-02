@@ -1,23 +1,26 @@
-package api
+package http
 
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/octokerbs/chronocode-backend/internal/api/httperror"
 	"github.com/octokerbs/chronocode-backend/internal/application"
+	"github.com/octokerbs/chronocode-backend/internal/domain"
 )
 
 type AnalysisHandler struct {
 	repoAnalyzer *application.RepositoryAnalyzer
+	logger       domain.Logger
 }
 
-func NewAnalysisHandler(repoAnalyzer *application.RepositoryAnalyzer) *AnalysisHandler {
-	return &AnalysisHandler{repoAnalyzer}
+func NewAnalysisHandler(repoAnalyzer *application.RepositoryAnalyzer, logger domain.Logger) *AnalysisHandler {
+	return &AnalysisHandler{
+		repoAnalyzer: repoAnalyzer,
+		logger:       logger,
+	}
 }
 
 func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
@@ -35,15 +38,21 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 	}
 
 	var accessToken string
-	if _, err := fmt.Sscanf(authHeader, "Bearer %s", &accessToken); err != nil {
+	if _, err := fmt.Sscanf(authHeader, "Bearer %s", &accessToken); err != nil { //...
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid Authorization header format"})
 		return
 	}
 
 	repo, codeHost, err := h.repoAnalyzer.PrepareAnalysis(c.Request.Context(), repoURL, accessToken)
 	if err != nil {
-		httpErr := httperror.FromError(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"status": httpErr.Status, "message": httpErr.Message})
+		httpErr := FromError(err)
+
+		if httpErr.Status == 0 { // Empty status indicates internal server error
+			c.JSON(http.StatusInternalServerError, gin.H{"message": httpErr.Message})
+			return
+		}
+
+		c.JSON(httpErr.Status, gin.H{"message": httpErr.Message})
 		return
 	}
 
@@ -52,9 +61,9 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		defer cancel()
 
 		if err := h.repoAnalyzer.RunAnalysis(analysisCtx, repo, codeHost); err != nil {
-			log.Printf("Background analysis failed for %s: %v", repoURL, err)
+			h.logger.Error("Background analysis failed", err, "repoURL", repoURL)
 		} else {
-			log.Printf("Background analysis complete for %s", repoURL)
+			h.logger.Info("Background analysis complete", "repoURL", repoURL)
 		}
 	}()
 

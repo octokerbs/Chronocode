@@ -12,7 +12,7 @@ type RepositoryAnalyzer struct {
 	Agent           domain.Agent
 	CodeHostFactory domain.CodeHostFactory
 	Database        domain.Database
-	Log             Logger
+	Log             domain.Logger
 
 	newHeadMutex sync.Mutex
 	newHeadSHA   string
@@ -23,7 +23,7 @@ func NewRepositoryAnalyzer(
 	agent domain.Agent,
 	codehostFactory domain.CodeHostFactory,
 	database domain.Database,
-	log Logger,
+	log domain.Logger,
 ) *RepositoryAnalyzer {
 	ra := &RepositoryAnalyzer{
 		Agent:           agent,
@@ -130,7 +130,7 @@ func (ra *RepositoryAnalyzer) clean() {
 	ra.newHeadMutex.Unlock()
 }
 
-func (ra *RepositoryAnalyzer) fetchOrCreateRepository(ctx context.Context, repoURL string, codeHost domain.CodeHost, log Logger) (*domain.Repository, error) {
+func (ra *RepositoryAnalyzer) fetchOrCreateRepository(ctx context.Context, repoURL string, codeHost domain.CodeHost, log domain.Logger) (*domain.Repository, error) {
 	fetchedRepository, err := codeHost.FetchRepository(ctx, repoURL)
 	if err != nil {
 		log.Error("Failed to fetch repository from code host", err)
@@ -171,7 +171,7 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(
 	commitSHAs <-chan string,
 	commits chan<- *domain.Commit,
 	wg *sync.WaitGroup,
-	log Logger,
+	log domain.Logger,
 ) {
 	defer func() {
 		wg.Done()
@@ -204,7 +204,7 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(
 	}
 }
 
-func (ra *RepositoryAnalyzer) commitPersistencyWorker(ctx context.Context, commits <-chan *domain.Commit, wg *sync.WaitGroup, log Logger) {
+func (ra *RepositoryAnalyzer) commitPersistencyWorker(ctx context.Context, commits <-chan *domain.Commit, wg *sync.WaitGroup, log domain.Logger) {
 	defer func() {
 		wg.Done()
 	}()

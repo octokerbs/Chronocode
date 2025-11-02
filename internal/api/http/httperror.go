@@ -1,4 +1,4 @@
-package httperror
+package http
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 )
 
 type APIError struct {
-	Status  string
+	Status  int
 	Message string
 }
 
@@ -20,13 +20,13 @@ func FromError(err error) APIError {
 		svcErr := svcError.Category()
 		switch svcErr {
 		case domain.ErrBadRequest:
-			apiError.Status = http.StatusText(http.StatusBadRequest)
+			apiError.Status = http.StatusBadRequest
 		case domain.ErrInternalFailure:
-			apiError.Status = http.StatusText(http.StatusInternalServerError)
+			apiError.Status = http.StatusInternalServerError
 		}
 		apiError.Message = svcError.Specific().Error()
 	} else {
-		apiError.Status = http.StatusText(http.StatusInternalServerError)
+		apiError.Status = http.StatusInternalServerError
 		apiError.Message = "An unexpected error occurred"
 	}
 

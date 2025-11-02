@@ -7,7 +7,7 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o main ./cmd/chronocode/server.go
+RUN go build -o main ./cmd/chronocode/main.go
 
 COPY migrations ./migrations
 

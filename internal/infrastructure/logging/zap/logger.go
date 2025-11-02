@@ -1,7 +1,7 @@
 package zap
 
 import (
-	"github.com/octokerbs/chronocode-backend/internal/application"
+	"github.com/octokerbs/chronocode-backend/internal/domain"
 	"go.uber.org/zap"
 )
 
@@ -31,7 +31,7 @@ func (l *Logger) Error(msg string, err error, keysAndValues ...interface{}) {
 	l.zapLogger.sugaredLogger.Errorw(msg, allArgs...)
 }
 
-func (l *Logger) With(keysAndValues ...interface{}) application.Logger {
+func (l *Logger) With(keysAndValues ...interface{}) domain.Logger {
 	return &Logger{zapLogger: l.zapLogger.With(keysAndValues...)}
 }
 
