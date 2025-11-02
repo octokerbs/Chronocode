@@ -110,7 +110,7 @@ func (d *Database) StoreCommit(ctx context.Context, commit *domain.Commit) error
 		return domain.NewError(domain.ErrInternalFailure, err)
 	}
 
-	if err := d.StoreSubcommits(ctx, tx, commit.Subcommits); err != nil {
+	if err := d.storeSubcommits(tx, commit.Subcommits); err != nil {
 		return domain.NewError(domain.ErrInternalFailure, err)
 	}
 
@@ -121,7 +121,7 @@ func (d *Database) StoreCommit(ctx context.Context, commit *domain.Commit) error
 	return nil
 }
 
-func (d *Database) StoreSubcommits(ctx context.Context, tx *sql.Tx, subcommits []*domain.Subcommit) error {
+func (d *Database) storeSubcommits(tx *sql.Tx, subcommits []*domain.Subcommit) error {
 	if len(subcommits) == 0 {
 		return nil
 	}
