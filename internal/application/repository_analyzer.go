@@ -16,6 +16,9 @@ type RepositoryAnalyzer struct {
 
 	resultsMutex    sync.Mutex
 	analyzedCommits []*domain.Commit
+
+	newHeadMutex sync.Mutex
+	newHeadSHA   string
 }
 
 func NewRepositoryAnalyzer(
@@ -57,7 +60,7 @@ func (ra *RepositoryAnalyzer) RunAnalysis(ctx context.Context, repo *domain.Repo
 	log := ra.Log.With("repoURL", repo.URL, "repoID", repo.ID)
 	log.Info("Starting background analysis")
 
-	ra.cleanCommits()
+	ra.clean()
 
 	commitSHAs := make(chan string)
 	var wg sync.WaitGroup
@@ -72,39 +75,60 @@ func (ra *RepositoryAnalyzer) RunAnalysis(ctx context.Context, repo *domain.Repo
 
 	go func() {
 		log.Info("Starting commit SHA producer")
-		codeHost.ProduceCommitSHAs(ctx, repo.URL, repo.LastAnalyzedCommit, commitSHAs)
+		newHeadSHA, err := codeHost.ProduceCommitSHAs(ctx, repo.URL, repo.LastAnalyzedCommit, commitSHAs)
+		if err != nil {
+			log.Error("Commit SHA producer failed", err)
+			// Producer is responsible for closing commitSHAs chan even on error
+		} else if newHeadSHA != "" {
+			ra.newHeadMutex.Lock()
+			ra.newHeadSHA = newHeadSHA
+			ra.newHeadMutex.Unlock()
+			log.Info("Commit SHA producer identified new head", "newHeadSHA", newHeadSHA)
+		}
+		// Producer must close the channel to stop the workers
 		log.Info("Commit SHA producer finished")
 	}()
 
 	wg.Wait()
 	log.Info("All commit analysis workers finished")
 
+	// This part can be removed when you move to persistence workers
 	if len(ra.analyzedCommits) == 0 {
-		log.Info("No new commits found to store")
-		return nil
+		log.Info("No new commits were successfully analyzed and collected")
+	} else {
+		log.Info("Storing analyzed commits", "commitCount", len(ra.analyzedCommits))
+		if err := ra.Database.StoreCommits(ctx, ra.analyzedCommits); err != nil {
+			log.Error("Failed to store commits in database", err)
+			return err
+		}
 	}
 
-	log.Info("Storing analyzed commits", "commitCount", len(ra.analyzedCommits))
-	if err := ra.Database.StoreCommits(ctx, ra.analyzedCommits); err != nil {
-		log.Error("Failed to store commits in database", err)
-		return err
-	}
+	ra.newHeadMutex.Lock()
+	newHeadSHA := ra.newHeadSHA
+	ra.newHeadMutex.Unlock()
 
-	lastCommitSHA := ra.analyzedCommits[len(ra.analyzedCommits)-1].SHA
-	repo.UpdateLastAnalyzedCommit(lastCommitSHA)
-	log.Info("Updating repository's last analyzed commit", "lastCommitSHA", lastCommitSHA)
-
-	if err := ra.Database.StoreRepository(ctx, repo); err != nil {
-		log.Error("Failed to update repository with last analyzed commit", err)
-		return err
+	if newHeadSHA != "" && newHeadSHA != repo.LastAnalyzedCommit {
+		log.Info("Updating repository's last analyzed commit", "lastCommitSHA", newHeadSHA)
+		repo.UpdateLastAnalyzedCommit(newHeadSHA)
+		if err := ra.Database.StoreRepository(ctx, repo); err != nil {
+			log.Error("Failed to update repository with last analyzed commit", err)
+			return err
+		}
+	} else if newHeadSHA == "" {
+		log.Info("No new head commit SHA produced (no new commits or producer error)")
+	} else {
+		log.Info("New head SHA is the same as the last analyzed commit, no update needed.")
 	}
 
 	log.Info("Repository analysis finished successfully")
 	return nil
 }
 
-func (ra *RepositoryAnalyzer) cleanCommits() {
+func (ra *RepositoryAnalyzer) clean() {
 	ra.analyzedCommits = []*domain.Commit{}
+	ra.newHeadMutex.Lock()
+	ra.newHeadSHA = "" // Reset for this run
+	ra.newHeadMutex.Unlock()
 }
 
 func (ra *RepositoryAnalyzer) fetchOrCreateRepository(ctx context.Context, repoURL string, codeHost domain.CodeHost, log Logger) (*domain.Repository, error) {

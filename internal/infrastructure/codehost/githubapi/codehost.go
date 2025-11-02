@@ -101,18 +101,25 @@ func (ch *CodeHost) FetchCommitDiff(ctx context.Context, repoURL string, commitS
 	return diff, nil
 }
 
-func (ch *CodeHost) ProduceCommitSHAs(ctx context.Context, repoURL string, lastAnalyzedCommitSHA string, commits chan<- string) {
+func (ch *CodeHost) ProduceCommitSHAs(ctx context.Context, repoURL string, lastAnalyzedCommitSHA string, commits chan<- string) (string, error) {
+	defer close(commits)
+
 	repository, err := ch.github.fetchRepository(ctx, repoURL)
 	if err != nil {
-		return
+		return "", ch.translateGithubError(err)
 	}
 
 	ch.github.setCommitOffset(lastAnalyzedCommitSHA)
 
+	var newHeadSHA string
 	for {
 		pageCommits, resp, err := ch.github.fetchCommits(ctx, repository)
 		if err != nil {
-			return
+			return "", ch.translateGithubError(err)
+		}
+
+		if newHeadSHA == "" && len(pageCommits) > 0 {
+			newHeadSHA = *pageCommits[0].SHA
 		}
 
 		for _, commit := range pageCommits {
@@ -126,7 +133,7 @@ func (ch *CodeHost) ProduceCommitSHAs(ctx context.Context, repoURL string, lastA
 		ch.github.nextPage(resp)
 	}
 
-	close(commits)
+	return newHeadSHA, nil
 }
 
 func (ch *CodeHost) translateGithubError(err error) error {
