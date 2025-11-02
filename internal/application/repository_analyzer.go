@@ -108,33 +108,34 @@ func (ra *RepositoryAnalyzer) cleanCommits() {
 }
 
 func (ra *RepositoryAnalyzer) fetchOrCreateRepository(ctx context.Context, repoURL string, codeHost domain.CodeHost, log Logger) (*domain.Repository, error) {
-	id, err := codeHost.FetchRepositoryID(ctx, repoURL)
+	fetchedRepository, err := codeHost.FetchRepository(ctx, repoURL)
 	if err != nil {
-		log.Error("Failed to fetch repository ID from code host", err)
+		log.Error("Failed to fetch repository from code host", err)
 		return nil, err
 	}
 
-	log = log.With("repoID", id)
-	log.Info("Fetched repository ID")
+	log = log.With("repoID", fetchedRepository.ID)
 
-	repo, err := ra.Database.GetRepository(ctx, id)
+	repo, err := ra.Database.GetRepository(ctx, fetchedRepository.ID)
+	if err == nil {
+		log.Info("Repository found in Database")
+		return repo, nil
+	}
+
+	if !errors.Is(err, domain.ErrRepositoryNotFound) {
+		return nil, err // Maybe a server error
+	}
+
+	log.Info("Repository not in Database, storing new repository in database")
+	if err := ra.Database.StoreRepository(ctx, fetchedRepository); err != nil {
+		log.Error("Failed to store new repository in database", err)
+		return nil, err
+	}
+
+	repo, err = ra.Database.GetRepository(ctx, fetchedRepository.ID)
 	if err != nil {
-		if errors.Is(err, domain.ErrRepositoryNotFound) {
-			log.Info("Repository not in Database, fetching from code host")
-			repo, err = codeHost.FetchRepository(ctx, repoURL)
-			if err != nil {
-				log.Error("Failed to fetch new repository from code host", err)
-				return nil, err
-			}
-
-			log.Info("Storing new repository in database")
-			if err := ra.Database.StoreRepository(ctx, repo); err != nil {
-				log.Error("Failed to store new repository in database", err)
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
+		log.Error("Failed to store new repository in database", err)
+		return nil, err
 	}
 
 	return repo, nil
