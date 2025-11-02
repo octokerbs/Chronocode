@@ -22,8 +22,13 @@ func NewAnalysisHandler(repoAnalyzer *application.RepositoryAnalyzer) *AnalysisH
 
 func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 	repoURL := c.Query("repo_url")
-
 	authHeader := c.GetHeader("Authorization")
+
+	if repoURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "repo_url query parameter is required"})
+		return
+	}
+
 	if authHeader == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Authorization header is required"})
 		return
@@ -35,11 +40,10 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		return
 	}
 
-	if repoURL == "" || accessToken == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "repo_url and access_token are required",
-		})
+	repo, codeHost, err := h.repoAnalyzer.PrepareAnalysis(c.Request.Context(), repoURL, accessToken)
+	if err != nil {
+		httpErr := httperror.FromError(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"status": httpErr.Status, "message": httpErr.Message})
 		return
 	}
 
@@ -47,8 +51,8 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		analysisCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
 
-		if err := h.repoAnalyzer.AnalyzeRepository(analysisCtx, repoURL, accessToken); err != nil {
-			log.Printf("Background analysis failed for %s: %v", repoURL, httperror.FromError(err))
+		if err := h.repoAnalyzer.RunAnalysis(analysisCtx, repo, codeHost); err != nil {
+			log.Printf("Background analysis failed for %s: %v", repoURL, err)
 		} else {
 			log.Printf("Background analysis complete for %s", repoURL)
 		}

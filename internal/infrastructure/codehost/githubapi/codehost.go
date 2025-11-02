@@ -135,17 +135,13 @@ func (ch *CodeHost) translateGithubError(err error) error {
 	var githubErr *github.ErrorResponse
 	if errors.As(err, &githubErr) {
 		switch githubErr.Response.StatusCode {
+		case 400:
+			return domain.ErrBadRequest
 		case 404:
 			return domain.ErrNotFound
 		case 401, 403:
 			return domain.ErrUnauthorized
-		default:
-			return domain.NewError(domain.ErrInternalFailure, err)
 		}
-	}
-
-	if errors.Is(err, domain.ErrInvalidURL) || errors.Is(err, domain.ErrNotSupported) {
-		return domain.NewError(domain.ErrBadRequest, err)
 	}
 
 	return domain.NewError(domain.ErrInternalFailure, err)
@@ -193,12 +189,12 @@ func (gc *githubClient) parseRepoURL(repoURL string) (string, string, error) {
 	}
 
 	if parsedURL.Host != "github.com" {
-		return "", "", fmt.Errorf("url '%s' is not github.com: %w", repoURL, domain.ErrNotSupported)
+		return "", "", fmt.Errorf("url '%s' is not github.com", repoURL)
 	}
 
 	pathParts := strings.Split(strings.TrimPrefix(parsedURL.Path, "/"), "/")
 	if len(pathParts) < 2 {
-		return "", "", fmt.Errorf("url '%s' has invalid path: %w", repoURL, domain.ErrInvalidURL)
+		return "", "", fmt.Errorf("url '%s' has invalid path", repoURL)
 	}
 
 	repoName := strings.TrimSuffix(pathParts[1], ".git")

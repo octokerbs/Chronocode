@@ -2,12 +2,6 @@ package domain
 
 import (
 	"context"
-	"errors"
-)
-
-var (
-	ErrInvalidURL   = errors.New("invalid repository URL format")
-	ErrNotSupported = errors.New("not supported version control repository")
 )
 
 type CodeHost interface {

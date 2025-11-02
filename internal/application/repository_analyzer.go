@@ -36,23 +36,30 @@ func NewRepositoryAnalyzer(
 	return ra
 }
 
-func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL string, accessToken string) error {
-	log := ra.Log.With("repoURL", repoURL) // Give me a new logger that also has the repoURL field
-	log.Info("Starting repository analysis")
+func (ra *RepositoryAnalyzer) PrepareAnalysis(ctx context.Context, repoURL string, accessToken string) (*domain.Repository, domain.CodeHost, error) {
+	log := ra.Log.With("repoURL", repoURL)
+	log.Info("Preparing repository analysis")
 
 	codeHost := ra.CodeHostFactory.Create(ctx, accessToken)
-	commits := make(chan string)
 
 	repo, err := ra.fetchOrCreateRepository(ctx, repoURL, codeHost, log)
 	if err != nil {
-		return err
+		log.Error("Failed to fetch or create repository", err)
+		return nil, nil, err
 	}
 
-	log = log.With("repoID", repo.ID)
-	log.Info("Successfully fetched repository", "lastAnalyzedCommit", repo.LastAnalyzedCommit)
+	log.Info("Repository validated successfully", "repoID", repo.ID)
 
-	ra.CleanCommits()
+	return repo, codeHost, nil
+}
 
+func (ra *RepositoryAnalyzer) RunAnalysis(ctx context.Context, repo *domain.Repository, codeHost domain.CodeHost) error {
+	log := ra.Log.With("repoURL", repo.URL, "repoID", repo.ID)
+	log.Info("Starting background analysis")
+
+	ra.cleanCommits()
+
+	commits := make(chan string)
 	var wg sync.WaitGroup
 	const numWorkers = 200
 	log.Info("Starting commit analysis workers", "workerCount", numWorkers)
@@ -60,16 +67,18 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL str
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		workerLog := log.With("workerID", i)
-		go ra.commitAnalyzerWorker(ctx, repoURL, codeHost, commits, &wg, workerLog)
+		go ra.commitAnalyzerWorker(ctx, repo.URL, codeHost, commits, &wg, workerLog)
 	}
 
 	go func() {
 		log.Info("Starting commit SHA producer")
-		codeHost.ProduceCommitSHAs(ctx, repoURL, repo.LastAnalyzedCommit, commits) // When ProduceCommits is done, it closes the channel
+		codeHost.ProduceCommitSHAs(ctx, repo.URL, repo.LastAnalyzedCommit, commits)
 		log.Info("Commit SHA producer finished")
 	}()
 
 	wg.Wait()
+	log.Info("All commit analysis workers finished")
+
 	log.Info("All commit analysis workers finished")
 
 	if len(ra.analyzedCommits) == 0 {
@@ -96,7 +105,7 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(ctx context.Context, repoURL str
 	return nil
 }
 
-func (ra *RepositoryAnalyzer) CleanCommits() {
+func (ra *RepositoryAnalyzer) cleanCommits() {
 	ra.analyzedCommits = []*domain.Commit{}
 }
 
@@ -112,7 +121,7 @@ func (ra *RepositoryAnalyzer) fetchOrCreateRepository(ctx context.Context, repoU
 
 	repo, err := ra.Database.GetRepository(ctx, id)
 	if err != nil {
-		if errors.Is(err, domain.ErrRepositoryNotFound) {
+		if errors.Is(err, domain.ErrNotFound) {
 			log.Info("Repository not in Database, fetching from code host")
 			repo, err = codeHost.FetchRepository(ctx, repoURL)
 			if err != nil {
