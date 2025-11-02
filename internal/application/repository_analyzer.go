@@ -14,9 +14,6 @@ type RepositoryAnalyzer struct {
 	Database        domain.Database
 	Log             Logger
 
-	resultsMutex    sync.Mutex
-	analyzedCommits []*domain.Commit
-
 	newHeadMutex sync.Mutex
 	newHeadSHA   string
 }
@@ -33,7 +30,6 @@ func NewRepositoryAnalyzer(
 		CodeHostFactory: codehostFactory,
 		Database:        database,
 		Log:             log.With("service", "RepositoryAnalyzer"),
-		analyzedCommits: []*domain.Commit{},
 	}
 
 	return ra
@@ -63,45 +59,49 @@ func (ra *RepositoryAnalyzer) RunAnalysis(ctx context.Context, repo *domain.Repo
 	ra.clean()
 
 	commitSHAs := make(chan string)
-	var wg sync.WaitGroup
-	const numWorkers = 200
-	log.Info("Starting commit analysis workers", "workerCount", numWorkers)
+	commits := make(chan *domain.Commit)
 
-	for i := 0; i < numWorkers; i++ {
-		wg.Add(1)
-		workerLog := log.With("workerID", i)
-		go ra.commitAnalyzerWorker(ctx, repo.URL, codeHost, commitSHAs, &wg, workerLog)
+	var wgAnalyzers sync.WaitGroup
+	var wgPersistency sync.WaitGroup
+	const numAnalyzerWorkers = 20
+	const numPersistencyWorkers = 40
+
+	log.Info("Starting commit analysis workers", "workerCount", numAnalyzerWorkers)
+	for i := 0; i < numAnalyzerWorkers; i++ {
+		wgAnalyzers.Add(1)
+		workerLog := log.With("analyzerWorkerID", i)
+		go ra.commitAnalyzerWorker(ctx, repo.URL, codeHost, commitSHAs, commits, &wgAnalyzers, workerLog)
+	}
+
+	log.Info("Starting persistency workers", "workerCount", numPersistencyWorkers)
+	for i := 0; i < numPersistencyWorkers; i++ {
+		wgPersistency.Add(1)
+		workerLog := log.With("persistencyWorkerID", i)
+		go ra.commitPersistencyWorker(ctx, commits, &wgPersistency, workerLog)
 	}
 
 	go func() {
+		defer close(commitSHAs)
+
 		log.Info("Starting commit SHA producer")
 		newHeadSHA, err := codeHost.ProduceCommitSHAs(ctx, repo.URL, repo.LastAnalyzedCommit, commitSHAs)
 		if err != nil {
 			log.Error("Commit SHA producer failed", err)
-			// Producer is responsible for closing commitSHAs chan even on error
 		} else if newHeadSHA != "" {
 			ra.newHeadMutex.Lock()
 			ra.newHeadSHA = newHeadSHA
 			ra.newHeadMutex.Unlock()
 			log.Info("Commit SHA producer identified new head", "newHeadSHA", newHeadSHA)
 		}
-		// Producer must close the channel to stop the workers
+
 		log.Info("Commit SHA producer finished")
 	}()
 
-	wg.Wait()
-	log.Info("All commit analysis workers finished")
+	wgAnalyzers.Wait()
+	close(commits)
+	wgPersistency.Wait()
 
-	// This part can be removed when you move to persistence workers
-	if len(ra.analyzedCommits) == 0 {
-		log.Info("No new commits were successfully analyzed and collected")
-	} else {
-		log.Info("Storing analyzed commits", "commitCount", len(ra.analyzedCommits))
-		if err := ra.Database.StoreCommits(ctx, ra.analyzedCommits); err != nil {
-			log.Error("Failed to store commits in database", err)
-			return err
-		}
-	}
+	log.Info("All commit analysis workers finished")
 
 	ra.newHeadMutex.Lock()
 	newHeadSHA := ra.newHeadSHA
@@ -125,7 +125,6 @@ func (ra *RepositoryAnalyzer) RunAnalysis(ctx context.Context, repo *domain.Repo
 }
 
 func (ra *RepositoryAnalyzer) clean() {
-	ra.analyzedCommits = []*domain.Commit{}
 	ra.newHeadMutex.Lock()
 	ra.newHeadSHA = "" // Reset for this run
 	ra.newHeadMutex.Unlock()
@@ -146,7 +145,7 @@ func (ra *RepositoryAnalyzer) fetchOrCreateRepository(ctx context.Context, repoU
 		return repo, nil
 	}
 
-	if !errors.Is(err, domain.ErrRepositoryNotFound) {
+	if !errors.Is(err, domain.ErrNotFound) {
 		return nil, err // Maybe a server error
 	}
 
@@ -170,6 +169,7 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(
 	repoURL string,
 	codeHost domain.CodeHost,
 	commitSHAs <-chan string,
+	commits chan<- *domain.Commit,
 	wg *sync.WaitGroup,
 	log Logger,
 ) {
@@ -200,8 +200,19 @@ func (ra *RepositoryAnalyzer) commitAnalyzerWorker(
 
 		commit.ApplyAnalysis(&analysis)
 
-		ra.resultsMutex.Lock()
-		ra.analyzedCommits = append(ra.analyzedCommits, commit)
-		ra.resultsMutex.Unlock()
+		commits <- commit
+	}
+}
+
+func (ra *RepositoryAnalyzer) commitPersistencyWorker(ctx context.Context, commits <-chan *domain.Commit, wg *sync.WaitGroup, log Logger) {
+	defer func() {
+		wg.Done()
+	}()
+
+	for commit := range commits {
+		if err := ra.Database.StoreCommit(ctx, commit); err != nil {
+			log.Error("Failed to store commit in database", err)
+			continue
+		}
 	}
 }

@@ -101,9 +101,7 @@ func (ch *CodeHost) FetchCommitDiff(ctx context.Context, repoURL string, commitS
 	return diff, nil
 }
 
-func (ch *CodeHost) ProduceCommitSHAs(ctx context.Context, repoURL string, lastAnalyzedCommitSHA string, commits chan<- string) (string, error) {
-	defer close(commits)
-
+func (ch *CodeHost) ProduceCommitSHAs(ctx context.Context, repoURL string, lastAnalyzedCommitSHA string, commitSHAs chan<- string) (string, error) {
 	repository, err := ch.github.fetchRepository(ctx, repoURL)
 	if err != nil {
 		return "", ch.translateGithubError(err)
@@ -123,7 +121,7 @@ func (ch *CodeHost) ProduceCommitSHAs(ctx context.Context, repoURL string, lastA
 		}
 
 		for _, commit := range pageCommits {
-			commits <- *commit.SHA
+			commitSHAs <- *commit.SHA
 		}
 
 		if resp.NextPage == 0 {

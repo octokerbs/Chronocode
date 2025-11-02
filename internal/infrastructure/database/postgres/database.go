@@ -9,8 +9,6 @@ import (
 	"github.com/octokerbs/chronocode-backend/internal/domain"
 )
 
-var errEmptyConnectionString = errors.New("database connection string is empty")
-
 type Database struct {
 	postgres *postgresClient
 }
@@ -18,7 +16,7 @@ type Database struct {
 func NewPostgresDatabase(connectionString string) (*Database, error) {
 	client, err := newPostgresClient(connectionString)
 	if err != nil {
-		return nil, err
+		return nil, domain.NewError(domain.ErrInternalFailure, err)
 	}
 
 	return &Database{client}, nil
@@ -43,7 +41,7 @@ func (d *Database) GetRepository(ctx context.Context, id int64) (*domain.Reposit
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.ErrRepositoryNotFound
+			return nil, domain.ErrNotFound
 		}
 
 		return nil, domain.NewError(domain.ErrInternalFailure, err)
@@ -77,8 +75,8 @@ func (d *Database) StoreRepository(ctx context.Context, repo *domain.Repository)
 	return nil
 }
 
-func (d *Database) StoreCommits(ctx context.Context, commits []*domain.Commit) error {
-	if len(commits) == 0 {
+func (d *Database) StoreCommit(ctx context.Context, commit *domain.Commit) error {
+	if commit == nil {
 		return nil
 	}
 
@@ -88,41 +86,39 @@ func (d *Database) StoreCommits(ctx context.Context, commits []*domain.Commit) e
 	}
 	defer tx.Rollback()
 
-	columns := []string{
-		"sha", "created_at", "author", "date", "message", "url",
-		"author_email", "description", "author_url", "files", "repo_id",
-	}
+	const sqlInsert = `
+        INSERT INTO commit (
+            sha, created_at, author, date, message, url,
+            author_email, description, author_url, files, repo_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    `
 
-	stmt, err := tx.Prepare(pq.CopyIn("commit", columns...))
+	_, err = tx.ExecContext(ctx, sqlInsert,
+		commit.SHA,
+		commit.CreatedAt,
+		commit.Author,
+		commit.Date,
+		commit.Message,
+		commit.URL,
+		commit.AuthorEmail,
+		commit.Description,
+		commit.AuthorURL,
+		pq.Array(commit.Files),
+		commit.RepoID,
+	)
 	if err != nil {
 		return domain.NewError(domain.ErrInternalFailure, err)
 	}
 
-	for _, c := range commits {
-		_, err = stmt.Exec(
-			c.SHA, c.CreatedAt, c.Author, c.Date, c.Message, c.URL,
-			c.AuthorEmail, c.Description, c.AuthorURL, pq.Array(c.Files), c.RepoID,
-		)
-		if err != nil {
-			return domain.NewError(domain.ErrInternalFailure, err)
-		}
-	}
-
-	if _, err = stmt.Exec(); err != nil {
+	if err := d.StoreSubcommits(ctx, tx, commit.Subcommits); err != nil {
 		return domain.NewError(domain.ErrInternalFailure, err)
 	}
 
-	if err = stmt.Close(); err != nil {
+	if err = tx.Commit(); err != nil {
 		return domain.NewError(domain.ErrInternalFailure, err)
 	}
 
-	for _, commit := range commits {
-		if err := d.StoreSubcommits(ctx, tx, commit.Subcommits); err != nil {
-			return domain.NewError(domain.ErrInternalFailure, err)
-		}
-	}
-
-	return tx.Commit()
+	return nil
 }
 
 func (d *Database) StoreSubcommits(ctx context.Context, tx *sql.Tx, subcommits []*domain.Subcommit) error {
@@ -167,7 +163,7 @@ type postgresClient struct {
 
 func newPostgresClient(dsn string) (*postgresClient, error) {
 	if dsn == "" {
-		return nil, errEmptyConnectionString
+		return nil, errors.New("database connection string is empty")
 	}
 
 	db, err := sql.Open("postgres", dsn)
