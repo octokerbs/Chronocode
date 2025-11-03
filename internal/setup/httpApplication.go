@@ -14,13 +14,13 @@ import (
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/logging/zap"
 )
 
-type Application struct {
-	Config           *config.Config
-	ChronocodeServer *http.ChronocodeServer
-	Logger           domain.Logger
+type HTTPApplication struct {
+	Config *config.HTTPConfig
+	Server *http.Server
+	Logger domain.Logger
 }
 
-func NewApplication(cfg *config.Config) (*Application, error) {
+func NewHTTPApplication(cfg *config.HTTPConfig) (*HTTPApplication, error) {
 	ctx := context.Background()
 
 	logger, err := zap.NewLogger()
@@ -46,21 +46,21 @@ func NewApplication(cfg *config.Config) (*Application, error) {
 	repoAnalyzer := application.NewRepositoryAnalyzer(ctx, geminiClient, githubClient, postgresClient, logger)
 
 	logger.Info("Initializing API server...")
-	server := http.NewChronocodeServer(cfg.Port, logger, repoAnalyzer)
+	server := http.NewServer(cfg.Port, logger, repoAnalyzer)
 
-	return &Application{
-		Config:           cfg,
-		ChronocodeServer: server,
-		Logger:           logger,
+	return &HTTPApplication{
+		Config: cfg,
+		Server: server,
+		Logger: logger,
 	}, nil
 }
 
-func (a *Application) Run() error {
-	a.Logger.Info("Starting server...", "port", a.Config.Port)
-	return a.ChronocodeServer.Run()
+func (ha *HTTPApplication) Run() error {
+	ha.Logger.Info("Starting server...", "port", ha.Config.Port)
+	return ha.Server.Run()
 }
 
-func (a *Application) Shutdown(ctx context.Context) error {
-	a.Logger.Info("Shutting down server...")
-	return a.ChronocodeServer.Shutdown(ctx)
+func (ha *HTTPApplication) Shutdown(ctx context.Context) error {
+	ha.Logger.Info("Shutting down server...")
+	return ha.Server.Shutdown(ctx)
 }
