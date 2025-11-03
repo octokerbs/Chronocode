@@ -2,25 +2,15 @@ package main
 
 import (
 	"context"
-	"log"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/octokerbs/chronocode-backend/internal/config"
 	"github.com/octokerbs/chronocode-backend/internal/setup"
 )
 
 func main() {
-	cfg, err := config.NewHTTPConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
-
-	httpApp, err := setup.NewHTTPApplication(cfg)
-	if err != nil {
-		log.Fatalf("Failed to bootstrap application: %v", err)
-	}
+	httpApp := setup.NewHTTPApplication()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

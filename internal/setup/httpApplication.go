@@ -2,7 +2,7 @@ package setup
 
 import (
 	"context"
-	"fmt"
+	"log"
 
 	"github.com/octokerbs/chronocode-backend/internal/api/http"
 	"github.com/octokerbs/chronocode-backend/internal/application"
@@ -15,44 +15,67 @@ import (
 )
 
 type HTTPApplication struct {
-	Config *config.HTTPConfig
-	Server *http.Server
-	Logger domain.Logger
+	Config   *config.HTTPConfig
+	Logger   domain.Logger
+	Server   *http.Server
+	DB       domain.Database
+	Analyzer *application.RepositoryAnalyzer
+	Timeline *application.TimelineService
 }
 
-func NewHTTPApplication(cfg *config.HTTPConfig) (*HTTPApplication, error) {
-	ctx := context.Background()
+func NewHTTPApplication() *HTTPApplication {
+	cfg, err := config.NewHTTPConfig()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
 
 	logger, err := zap.NewLogger()
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize logger: %w", err)
+		log.Fatalf("Failed to initialize logger: %v", err)
 	}
-	logger.Info("Logger initialized")
 
-	logger.Info("Initializing infrastructure adapters...")
-	geminiClient, err := gemini.NewGeminiAgent(ctx, cfg.GeminiAPIKey)
+	ctx := context.Background()
+
+	db, err := postgres.NewPostgresDatabase(cfg.DatabaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init gemini client: %w", err)
+		logger.Error("Failed to initialize database", err)
 	}
 
-	githubClient := githubapi.NewGitHubFactory()
-
-	postgresClient, err := postgres.NewPostgresDatabase(cfg.DatabaseURL)
+	agent, err := gemini.NewGeminiAgent(ctx, cfg.GeminiAPIKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init postgres database: %w", err)
+		logger.Error("Failed to initialize gemini agent", err)
 	}
 
-	logger.Info("Initializing application layer...")
-	repoAnalyzer := application.NewRepositoryAnalyzer(ctx, geminiClient, githubClient, postgresClient, logger)
+	codeHostFactory := githubapi.NewGitHubFactory()
 
-	logger.Info("Initializing API server...")
-	server := http.NewServer(cfg.Port, logger, repoAnalyzer)
+	analyzerService := application.NewRepositoryAnalyzer(
+		ctx,
+		agent,
+		codeHostFactory,
+		db,
+		logger,
+	)
+
+	timelineService := application.NewTimelineService(
+		db,
+		logger,
+	)
+
+	server := http.NewServer(
+		cfg.Port,
+		logger,
+		analyzerService,
+		timelineService,
+	)
 
 	return &HTTPApplication{
-		Config: cfg,
-		Server: server,
-		Logger: logger,
-	}, nil
+		Config:   cfg,
+		Logger:   logger,
+		Server:   server,
+		DB:       db,
+		Analyzer: analyzerService,
+		Timeline: timelineService,
+	}
 }
 
 func (ha *HTTPApplication) Run() error {

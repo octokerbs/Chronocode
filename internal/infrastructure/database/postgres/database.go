@@ -157,6 +157,59 @@ func (d *Database) storeSubcommits(tx *sql.Tx, subcommits []*domain.Subcommit) e
 	return nil
 }
 
+func (d *Database) GetSubcommitsByRepoID(ctx context.Context, repoID int64) ([]*domain.Subcommit, error) {
+	// Esta consulta une subcommit con commit para filtrar por repo_id
+	const query = `
+		SELECT 
+			sc.id, sc.created_at, sc.title, sc.idea, sc.description,
+			sc.commit_sha, sc.type, sc.epic, sc.files
+		FROM 
+			subcommit sc
+		JOIN 
+			commit c ON sc.commit_sha = c.sha
+		WHERE 
+			c.repo_id = $1
+		ORDER BY 
+			sc.created_at DESC`
+
+	rows, err := d.postgres.DB.QueryContext(ctx, query, repoID)
+	if err != nil {
+		return nil, domain.NewError(domain.ErrInternalFailure, err)
+	}
+	defer rows.Close()
+
+	var subcommits []*domain.Subcommit
+
+	for rows.Next() {
+		var sc domain.Subcommit
+		var files pq.StringArray
+
+		err := rows.Scan(
+			&sc.ID,
+			&sc.CreatedAt,
+			&sc.Title,
+			&sc.Idea,
+			&sc.Description,
+			&sc.CommitSHA,
+			&sc.Type,
+			&sc.Epic,
+			&files,
+		)
+		if err != nil {
+			return nil, domain.NewError(domain.ErrInternalFailure, err)
+		}
+
+		sc.Files = files
+		subcommits = append(subcommits, &sc)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, domain.NewError(domain.ErrInternalFailure, err)
+	}
+
+	return subcommits, nil
+}
+
 type postgresClient struct {
 	DB *sql.DB
 }

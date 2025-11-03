@@ -52,7 +52,7 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 			return
 		}
 
-		c.JSON(httpErr.Status, gin.H{"message": httpErr.Message})
+		c.JSON(httpErr.Status, gin.H{"Message": httpErr.Message})
 		return
 	}
 

@@ -16,16 +16,18 @@ type Server struct {
 	logger     domain.Logger
 }
 
-func NewServer(port string, logger domain.Logger, repoAnalyzer *application.RepositoryAnalyzer) *Server {
+func NewServer(port string, logger domain.Logger, repoAnalyzer *application.RepositoryAnalyzer, timeline *application.TimelineService) *Server {
 	engine := gin.Default()
 
 	repoAnalyzerHandler := NewAnalysisHandler(repoAnalyzer, logger)
+	engine.POST("/analyze-repository", repoAnalyzerHandler.AnalyzeRepository)
 
-	engine.GET("/analyze-repository", repoAnalyzerHandler.AnalyzeRepository)
+	timelineHandler := NewTimelineHandler(timeline, logger)
+	engine.GET("/repository-timeline", timelineHandler.GetRepositoryTimeline)
 
 	httpServer := &http.Server{
 		Addr:    port,
-		Handler: engine, // Use gin engine as the HTTP handler
+		Handler: engine,
 	}
 
 	return &Server{
