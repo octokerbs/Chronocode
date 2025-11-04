@@ -5,13 +5,13 @@ import (
 	"log"
 
 	"github.com/octokerbs/chronocode-backend/internal/api/http"
-	"github.com/octokerbs/chronocode-backend/internal/application"
 	"github.com/octokerbs/chronocode-backend/internal/config"
 	"github.com/octokerbs/chronocode-backend/internal/domain"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/agent/gemini"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/codehost/githubapi"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/database/postgres"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/logging/zap"
+	"github.com/octokerbs/chronocode-backend/internal/service"
 )
 
 type HTTPApplication struct {
@@ -19,8 +19,8 @@ type HTTPApplication struct {
 	Logger   domain.Logger
 	Server   *http.Server
 	DB       domain.Database
-	Analyzer *application.RepositoryAnalyzer
-	Timeline *application.TimelineService
+	Analyzer *service.RepositoryAnalyzerService
+	Timeline *service.TimelineService
 }
 
 func NewHTTPApplication() *HTTPApplication {
@@ -48,7 +48,7 @@ func NewHTTPApplication() *HTTPApplication {
 
 	codeHostFactory := githubapi.NewGitHubFactory()
 
-	analyzerService := application.NewRepositoryAnalyzer(
+	analyzerService := service.NewRepositoryAnalyzer(
 		ctx,
 		agent,
 		codeHostFactory,
@@ -56,7 +56,7 @@ func NewHTTPApplication() *HTTPApplication {
 		logger,
 	)
 
-	timelineService := application.NewTimelineService(
+	timelineService := service.NewTimelineService(
 		db,
 		logger,
 	)

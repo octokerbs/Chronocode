@@ -1,4 +1,4 @@
-package application
+package service
 
 import (
 	"context"
@@ -19,8 +19,8 @@ func NewTimelineService(db domain.Database, logger domain.Logger) *TimelineServi
 	}
 }
 
-func (s *TimelineService) GetSubcommitsFromRepo(ctx context.Context, repoIDStr string) ([]*domain.Subcommit, error) {
-	log := s.logger.With("repoID", repoIDStr)
+func (ts *TimelineService) GetSubcommitsFromRepo(ctx context.Context, repoIDStr string) ([]*domain.Subcommit, error) {
+	log := ts.logger.With("repoID", repoIDStr)
 
 	repoID, err := strconv.ParseInt(repoIDStr, 10, 64)
 	if err != nil {
@@ -28,7 +28,7 @@ func (s *TimelineService) GetSubcommitsFromRepo(ctx context.Context, repoIDStr s
 		return nil, domain.NewError(domain.ErrBadRequest, err)
 	}
 
-	subcommits, err := s.db.GetSubcommitsByRepoID(ctx, repoID)
+	subcommits, err := ts.db.GetSubcommitsByRepoID(ctx, repoID)
 	if err != nil {
 		log.Error("Failed to get subcommits from database", err)
 		return nil, err

@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/octokerbs/chronocode-backend/internal/application"
 	"github.com/octokerbs/chronocode-backend/internal/domain"
+	"github.com/octokerbs/chronocode-backend/internal/service"
 )
 
 type Server struct {
@@ -16,7 +16,7 @@ type Server struct {
 	logger     domain.Logger
 }
 
-func NewServer(port string, logger domain.Logger, repoAnalyzer *application.RepositoryAnalyzer, timeline *application.TimelineService) *Server {
+func NewServer(port string, logger domain.Logger, repoAnalyzer *service.RepositoryAnalyzerService, timeline *service.TimelineService) *Server {
 	engine := gin.Default()
 
 	repoAnalyzerHandler := NewAnalysisHandler(repoAnalyzer, logger)

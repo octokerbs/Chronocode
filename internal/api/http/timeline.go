@@ -4,16 +4,16 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/octokerbs/chronocode-backend/internal/application"
 	"github.com/octokerbs/chronocode-backend/internal/domain"
+	"github.com/octokerbs/chronocode-backend/internal/service"
 )
 
 type TimelineHandler struct {
-	timelineService *application.TimelineService
+	timelineService *service.TimelineService
 	logger          domain.Logger
 }
 
-func NewTimelineHandler(service *application.TimelineService, logger domain.Logger) *TimelineHandler {
+func NewTimelineHandler(service *service.TimelineService, logger domain.Logger) *TimelineHandler {
 	return &TimelineHandler{
 		timelineService: service,
 		logger:          logger,

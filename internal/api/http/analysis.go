@@ -7,16 +7,16 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/octokerbs/chronocode-backend/internal/application"
 	"github.com/octokerbs/chronocode-backend/internal/domain"
+	"github.com/octokerbs/chronocode-backend/internal/service"
 )
 
 type AnalysisHandler struct {
-	repoAnalyzer *application.RepositoryAnalyzer
+	repoAnalyzer *service.RepositoryAnalyzerService
 	logger       domain.Logger
 }
 
-func NewAnalysisHandler(repoAnalyzer *application.RepositoryAnalyzer, logger domain.Logger) *AnalysisHandler {
+func NewAnalysisHandler(repoAnalyzer *service.RepositoryAnalyzerService, logger domain.Logger) *AnalysisHandler {
 	return &AnalysisHandler{
 		repoAnalyzer: repoAnalyzer,
 		logger:       logger,
