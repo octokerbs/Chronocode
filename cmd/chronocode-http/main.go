@@ -5,12 +5,10 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	"github.com/octokerbs/chronocode-backend/internal/setup"
 )
 
 func main() {
-	httpApp := setup.NewHTTPApplication()
+	httpApp := NewHTTPApplication()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

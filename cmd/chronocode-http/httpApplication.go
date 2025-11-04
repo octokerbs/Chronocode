@@ -1,4 +1,4 @@
-package setup
+package main
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 type HTTPApplication struct {
 	Config   *config.HTTPConfig
 	Logger   domain.Logger
-	Server   *http.Server
+	Server   *http.HttpServer
 	DB       domain.Database
 	Analyzer *service.RepositoryAnalyzerService
 	Timeline *service.TimelineService

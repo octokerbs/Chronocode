@@ -10,13 +10,13 @@ import (
 	"github.com/octokerbs/chronocode-backend/internal/service"
 )
 
-type Server struct {
+type HttpServer struct {
 	httpServer *http.Server
 	engine     *gin.Engine
 	logger     domain.Logger
 }
 
-func NewServer(port string, logger domain.Logger, repoAnalyzer *service.RepositoryAnalyzerService, timeline *service.TimelineService) *Server {
+func NewServer(port string, logger domain.Logger, repoAnalyzer *service.RepositoryAnalyzerService, timeline *service.TimelineService) *HttpServer {
 	engine := gin.Default()
 
 	repoAnalyzerHandler := NewAnalysisHandler(repoAnalyzer, logger)
@@ -30,20 +30,20 @@ func NewServer(port string, logger domain.Logger, repoAnalyzer *service.Reposito
 		Handler: engine,
 	}
 
-	return &Server{
+	return &HttpServer{
 		httpServer: httpServer,
 		engine:     engine,
 		logger:     logger,
 	}
 }
 
-func (s *Server) Run() error {
+func (s *HttpServer) Run() error {
 	if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil
 }
 
-func (s *Server) Shutdown(ctx context.Context) error {
+func (s *HttpServer) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
