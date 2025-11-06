@@ -31,6 +31,11 @@ func (l *Logger) Error(msg string, err error, keysAndValues ...interface{}) {
 	l.zapLogger.sugaredLogger.Errorw(msg, allArgs...)
 }
 
+func (l *Logger) Fatal(msg string, err error, keysAndValues ...interface{}) {
+	allArgs := append(keysAndValues, "error", err)
+	l.zapLogger.sugaredLogger.Fatalw(msg, allArgs...)
+}
+
 func (l *Logger) With(keysAndValues ...interface{}) domain.Logger {
 	return &Logger{zapLogger: l.zapLogger.With(keysAndValues...)}
 }

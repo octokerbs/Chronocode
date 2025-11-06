@@ -1,13 +1,15 @@
-package domain
+package codehost
 
 import (
 	"context"
+
+	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
 )
 
 type CodeHost interface {
-	FetchRepository(ctx context.Context, repoURL string) (*Repository, error)
+	FetchRepository(ctx context.Context, repoURL string) (*analysis.Repository, error)
 	FetchRepositoryID(ctx context.Context, repoURL string) (int64, error)
-	FetchCommit(ctx context.Context, repoURL string, commitSHA string) (*Commit, error)
+	FetchCommit(ctx context.Context, repoURL string, commitSHA string) (*analysis.Commit, error)
 	FetchCommitDiff(ctx context.Context, repoURL string, commitSHA string) (string, error)
 
 	ProduceCommitSHAs(ctx context.Context, repoURL string, lastAnalyzedCommitSHA string, commitSHAs chan<- string) (string, error)

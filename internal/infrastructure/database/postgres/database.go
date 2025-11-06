@@ -7,6 +7,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/octokerbs/chronocode-backend/internal/domain"
+	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
 )
 
 type Database struct {
@@ -22,13 +23,13 @@ func NewPostgresDatabase(connectionString string) (*Database, error) {
 	return &Database{client}, nil
 }
 
-func (d *Database) GetRepository(ctx context.Context, id int64) (*domain.Repository, error) {
+func (d *Database) GetRepository(ctx context.Context, id int64) (*analysis.Repository, error) {
 	const query = `
 		SELECT id, created_at, name, url, last_analyzed_commit
 		FROM repository
 		WHERE id = $1`
 
-	repo := &domain.Repository{}
+	repo := &analysis.Repository{}
 
 	row := d.postgres.DB.QueryRowContext(ctx, query, id)
 	err := row.Scan(
@@ -50,7 +51,7 @@ func (d *Database) GetRepository(ctx context.Context, id int64) (*domain.Reposit
 	return repo, nil
 }
 
-func (d *Database) StoreRepository(ctx context.Context, repo *domain.Repository) error {
+func (d *Database) StoreRepository(ctx context.Context, repo *analysis.Repository) error {
 	const upsertQuery = `
         INSERT INTO repository (id, created_at, name, url, last_analyzed_commit)
         VALUES ($1, $2, $3, $4, $5)
@@ -75,7 +76,7 @@ func (d *Database) StoreRepository(ctx context.Context, repo *domain.Repository)
 	return nil
 }
 
-func (d *Database) StoreCommit(ctx context.Context, commit *domain.Commit) error {
+func (d *Database) StoreCommit(ctx context.Context, commit *analysis.Commit) error {
 	if commit == nil {
 		return nil
 	}
@@ -121,7 +122,7 @@ func (d *Database) StoreCommit(ctx context.Context, commit *domain.Commit) error
 	return nil
 }
 
-func (d *Database) storeSubcommits(tx *sql.Tx, subcommits []*domain.Subcommit) error {
+func (d *Database) storeSubcommits(tx *sql.Tx, subcommits []*analysis.Subcommit) error {
 	if len(subcommits) == 0 {
 		return nil
 	}
@@ -157,7 +158,7 @@ func (d *Database) storeSubcommits(tx *sql.Tx, subcommits []*domain.Subcommit) e
 	return nil
 }
 
-func (d *Database) GetSubcommitsByRepoID(ctx context.Context, repoID int64) ([]*domain.Subcommit, error) {
+func (d *Database) GetSubcommitsByRepoID(ctx context.Context, repoID int64) ([]*analysis.Subcommit, error) {
 	// Esta consulta une subcommit con commit para filtrar por repo_id
 	const query = `
 		SELECT 
@@ -178,10 +179,10 @@ func (d *Database) GetSubcommitsByRepoID(ctx context.Context, repoID int64) ([]*
 	}
 	defer rows.Close()
 
-	var subcommits []*domain.Subcommit
+	var subcommits []*analysis.Subcommit
 
 	for rows.Next() {
-		var sc domain.Subcommit
+		var sc analysis.Subcommit
 		var files pq.StringArray
 
 		err := rows.Scan(

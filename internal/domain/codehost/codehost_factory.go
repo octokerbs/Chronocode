@@ -1,4 +1,4 @@
-package domain
+package codehost
 
 import (
 	"context"

@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/octokerbs/chronocode-backend/internal/domain"
+	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
 	"google.golang.org/api/option"
 )
 
@@ -22,7 +23,7 @@ func NewGeminiAgent(ctx context.Context, apiKey string) (*Agent, error) {
 	return &Agent{gemini}, nil
 }
 
-func (a *Agent) AnalyzeCommitDiff(ctx context.Context, diff string) (domain.CommitAnalysis, error) {
+func (a *Agent) AnalyzeCommitDiff(ctx context.Context, diff string) (analysis.CommitAnalysis, error) {
 	tries := 3
 	prompt := a.gemini.commitAnalysisPrompt() + diff
 
@@ -37,15 +38,15 @@ func (a *Agent) AnalyzeCommitDiff(ctx context.Context, diff string) (domain.Comm
 	}
 
 	if err != nil {
-		return domain.CommitAnalysis{}, domain.NewError(domain.ErrInternalFailure, err)
+		return analysis.CommitAnalysis{}, domain.NewError(domain.ErrInternalFailure, err)
 	}
 
-	var analysis domain.CommitAnalysis
-	if err := json.Unmarshal(text, &analysis); err != nil {
-		return domain.CommitAnalysis{}, domain.NewError(domain.ErrInternalFailure, err)
+	var commitAnalysis analysis.CommitAnalysis
+	if err := json.Unmarshal(text, &commitAnalysis); err != nil {
+		return analysis.CommitAnalysis{}, domain.NewError(domain.ErrInternalFailure, err)
 	}
 
-	return analysis, nil
+	return commitAnalysis, nil
 }
 
 type geminiClient struct {

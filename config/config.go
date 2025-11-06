@@ -14,11 +14,6 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-// HTTPConfig holds configuration for the HTTP application.
-// It loads settings from environment variables.
-// Required environment variables:
-// - DATABASE_URL: the database connection URL
-// - GEMINI_API_KEY: the API key for the Gemini agent
 type HTTPConfig struct {
 	Port         string
 	DatabaseURL  string

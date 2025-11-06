@@ -1,4 +1,4 @@
-package http
+package analysis
 
 import (
 	"context"
@@ -7,19 +7,23 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/octokerbs/chronocode-backend/internal/api/http/handler"
 	"github.com/octokerbs/chronocode-backend/internal/domain"
-	"github.com/octokerbs/chronocode-backend/internal/service"
+	"github.com/octokerbs/chronocode-backend/internal/service/analysis"
+	"github.com/octokerbs/chronocode-backend/internal/service/query"
 )
 
 type AnalysisHandler struct {
-	repoAnalyzer *service.RepositoryAnalyzerService
-	logger       domain.Logger
+	Analyzer *analysis.Analyzer
+	Querier  *query.Querier
+	logger   domain.Logger
 }
 
-func NewAnalysisHandler(repoAnalyzer *service.RepositoryAnalyzerService, logger domain.Logger) *AnalysisHandler {
+func NewAnalysisHandler(analyzer *analysis.Analyzer, querier *query.Querier, logger domain.Logger) *AnalysisHandler {
 	return &AnalysisHandler{
-		repoAnalyzer: repoAnalyzer,
-		logger:       logger,
+		Analyzer: analyzer,
+		Querier:  querier,
+		logger:   logger,
 	}
 }
 
@@ -43,9 +47,9 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		return
 	}
 
-	repo, codeHost, err := h.repoAnalyzer.PrepareAnalysis(c.Request.Context(), repoURL, accessToken)
+	repo, codeHost, err := h.Analyzer.PrepareAnalysis(c.Request.Context(), repoURL, accessToken)
 	if err != nil {
-		httpErr := FromError(err)
+		httpErr := handler.FromError(err)
 
 		if httpErr.Status == 0 { // Empty status indicates internal server error
 			c.JSON(http.StatusInternalServerError, gin.H{"message": httpErr.Message})
@@ -60,7 +64,7 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		analysisCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
 
-		if err := h.repoAnalyzer.RunAnalysis(analysisCtx, repo, codeHost); err != nil {
+		if err := h.Analyzer.RunAnalysis(analysisCtx, repo, codeHost); err != nil {
 			h.logger.Error("Background analysis failed", err, "repoURL", repoURL)
 		} else {
 			h.logger.Info("Background analysis complete", "repoURL", repoURL)
@@ -71,4 +75,17 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		"status":  "pending",
 		"message": "Repository analysis has been queued.",
 	})
+}
+
+func (h *AnalysisHandler) GetSubcommits(c *gin.Context) {
+	repoID := c.Query("repo_id")
+
+	subcommits, err := h.Querier.GetSubcommitsFromRepo(c.Request.Context(), repoID)
+	if err != nil {
+		httpErr := handler.FromError(err)
+		c.JSON(httpErr.Status, gin.H{"message": httpErr.Message})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"subcommits": subcommits})
 }

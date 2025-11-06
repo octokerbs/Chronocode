@@ -1,25 +1,27 @@
-package service
+package query
 
 import (
 	"context"
 	"strconv"
 
 	"github.com/octokerbs/chronocode-backend/internal/domain"
+	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
+	"github.com/octokerbs/chronocode-backend/internal/domain/store"
 )
 
-type TimelineService struct {
-	db     domain.Database
+type Querier struct {
+	db     store.Database
 	logger domain.Logger
 }
 
-func NewTimelineService(db domain.Database, logger domain.Logger) *TimelineService {
-	return &TimelineService{
+func NewQuerier(db store.Database, logger domain.Logger) *Querier {
+	return &Querier{
 		db:     db,
 		logger: logger,
 	}
 }
 
-func (ts *TimelineService) GetSubcommitsFromRepo(ctx context.Context, repoIDStr string) ([]*domain.Subcommit, error) {
+func (ts *Querier) GetSubcommitsFromRepo(ctx context.Context, repoIDStr string) ([]*analysis.Subcommit, error) {
 	log := ts.logger.With("repoID", repoIDStr)
 
 	repoID, err := strconv.ParseInt(repoIDStr, 10, 64)

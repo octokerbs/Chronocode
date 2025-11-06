@@ -1,4 +1,4 @@
-package service
+package analysis
 
 import (
 	"context"
@@ -6,26 +6,29 @@ import (
 	"sync"
 
 	"github.com/octokerbs/chronocode-backend/internal/domain"
+	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
+	"github.com/octokerbs/chronocode-backend/internal/domain/codehost"
+	"github.com/octokerbs/chronocode-backend/internal/domain/store"
 )
 
-type RepositoryAnalyzerService struct {
-	Agent           domain.Agent
-	CodeHostFactory domain.CodeHostFactory
-	Database        domain.Database
+type Analyzer struct {
+	Agent           analysis.Agent
+	CodeHostFactory codehost.CodeHostFactory
+	Database        store.Database
 	Log             domain.Logger
 
 	newHeadMutex sync.Mutex
 	newHeadSHA   string
 }
 
-func NewRepositoryAnalyzer(
+func NewAnalyzer(
 	ctx context.Context,
-	agent domain.Agent,
-	codehostFactory domain.CodeHostFactory,
-	database domain.Database,
+	agent analysis.Agent,
+	codehostFactory codehost.CodeHostFactory,
+	database store.Database,
 	log domain.Logger,
-) *RepositoryAnalyzerService {
-	ra := &RepositoryAnalyzerService{
+) *Analyzer {
+	ra := &Analyzer{
 		Agent:           agent,
 		CodeHostFactory: codehostFactory,
 		Database:        database,
@@ -35,7 +38,7 @@ func NewRepositoryAnalyzer(
 	return ra
 }
 
-func (ras *RepositoryAnalyzerService) PrepareAnalysis(ctx context.Context, repoURL string, accessToken string) (*domain.Repository, domain.CodeHost, error) {
+func (ras *Analyzer) PrepareAnalysis(ctx context.Context, repoURL string, accessToken string) (*analysis.Repository, codehost.CodeHost, error) {
 	log := ras.Log.With("repoURL", repoURL)
 	log.Info("Preparing repository analysis")
 
@@ -52,14 +55,14 @@ func (ras *RepositoryAnalyzerService) PrepareAnalysis(ctx context.Context, repoU
 	return repo, codeHost, nil
 }
 
-func (ras *RepositoryAnalyzerService) RunAnalysis(ctx context.Context, repo *domain.Repository, codeHost domain.CodeHost) error {
+func (ras *Analyzer) RunAnalysis(ctx context.Context, repo *analysis.Repository, codeHost codehost.CodeHost) error {
 	log := ras.Log.With("repoURL", repo.URL, "repoID", repo.ID)
 	log.Info("Starting background analysis")
 
 	ras.clean()
 
 	commitSHAs := make(chan string)
-	commits := make(chan *domain.Commit)
+	commits := make(chan *analysis.Commit)
 
 	var wgAnalyzers sync.WaitGroup
 	var wgPersistency sync.WaitGroup
@@ -124,13 +127,13 @@ func (ras *RepositoryAnalyzerService) RunAnalysis(ctx context.Context, repo *dom
 	return nil
 }
 
-func (ras *RepositoryAnalyzerService) clean() {
+func (ras *Analyzer) clean() {
 	ras.newHeadMutex.Lock()
 	ras.newHeadSHA = "" // Reset for this run
 	ras.newHeadMutex.Unlock()
 }
 
-func (ras *RepositoryAnalyzerService) fetchOrCreateRepository(ctx context.Context, repoURL string, codeHost domain.CodeHost, log domain.Logger) (*domain.Repository, error) {
+func (ras *Analyzer) fetchOrCreateRepository(ctx context.Context, repoURL string, codeHost codehost.CodeHost, log domain.Logger) (*analysis.Repository, error) {
 	fetchedRepository, err := codeHost.FetchRepository(ctx, repoURL)
 	if err != nil {
 		log.Error("Failed to fetch repository from code host", err)
@@ -164,12 +167,12 @@ func (ras *RepositoryAnalyzerService) fetchOrCreateRepository(ctx context.Contex
 	return repo, nil
 }
 
-func (ras *RepositoryAnalyzerService) commitAnalyzerWorker(
+func (ras *Analyzer) commitAnalyzerWorker(
 	ctx context.Context,
 	repoURL string,
-	codeHost domain.CodeHost,
+	codeHost codehost.CodeHost,
 	commitSHAs <-chan string,
-	commits chan<- *domain.Commit,
+	commits chan<- *analysis.Commit,
 	wg *sync.WaitGroup,
 	log domain.Logger,
 ) {
@@ -204,7 +207,7 @@ func (ras *RepositoryAnalyzerService) commitAnalyzerWorker(
 	}
 }
 
-func (ras *RepositoryAnalyzerService) commitPersistencyWorker(ctx context.Context, commits <-chan *domain.Commit, wg *sync.WaitGroup, log domain.Logger) {
+func (ras *Analyzer) commitPersistencyWorker(ctx context.Context, commits <-chan *analysis.Commit, wg *sync.WaitGroup, log domain.Logger) {
 	defer func() {
 		wg.Done()
 	}()
