@@ -45,7 +45,7 @@ func main() {
 
 	codeHostFactory := githubapi.NewGitHubFactory()
 
-	repositoryAnalyzer := analysis.NewAnalyzer(
+	repositoryAnalyzer := analysis.NewRepositoryAnalyzer(
 		ctx,
 		agent,
 		codeHostFactory,
@@ -53,12 +53,12 @@ func main() {
 		logger,
 	)
 
-	repositoryQuerier := query.NewQuerier(
+	querier := query.NewQuerier(
 		db,
 		logger,
 	)
 
-	server := http.NewHTTPServer(repositoryAnalyzer, repositoryQuerier, cfg.Port, logger)
+	server := http.NewHTTPServer(repositoryAnalyzer, querier, cfg.Port, logger)
 
 	// Graceful termination
 	quit := make(chan os.Signal, 1)

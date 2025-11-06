@@ -21,7 +21,7 @@ type Analyzer struct {
 	newHeadSHA   string
 }
 
-func NewAnalyzer(
+func NewRepositoryAnalyzer(
 	ctx context.Context,
 	agent analysis.Agent,
 	codehostFactory codehost.CodeHostFactory,
