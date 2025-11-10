@@ -11,19 +11,17 @@ This is a port of a project made for the [ShipBA Hackaton 2025](https://www.ship
 
 ## ENV file setup
 ```env
-GEMINI_API_KEY=
-POSTGRES_DB=
 POSTGRES_USER=
-POSTGRES_PASSWORD=
+POSTGRES_PASSWORD=$
+POSTGRES_DB=
+GEMINI_API_KEY=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+REDIRECT_URL=http://localhost:8080/auth/github/callback
 ```
 
 ## Run
 ```bash
-docker compose up
+./rebuild.sh
 ```
 
-## Example
-```
-http://localhost:8080/analyze-repository?repo_url=https://github.com/octokerbs/50Cent-Dolar-Blue-Bot
-Bearer token with your github token.
-```
