@@ -9,24 +9,36 @@ import (
 	"time"
 
 	"github.com/google/go-github/github"
-	"github.com/octokerbs/chronocode-backend/internal/domain"
 	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
+	pkg_errors "github.com/octokerbs/chronocode-backend/pkg/errors"
 	"golang.org/x/oauth2"
 )
 
-type CodeHost struct {
-	github *githubClient
+type GithubCodeHost struct {
+	client  *github.Client
+	options *github.CommitsListOptions
 }
 
-func NewGithubCodeHost(ctx context.Context, accessToken string) *CodeHost {
-	github := newGithubClient(ctx, accessToken)
-	return &CodeHost{github}
+func NewGithubCodeHost(ctx context.Context, accessToken string) *GithubCodeHost {
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: accessToken},
+	)
+	tc := oauth2.NewClient(ctx, ts)
+	client := github.NewClient(tc)
+
+	options := &github.CommitsListOptions{
+		ListOptions: github.ListOptions{
+			PerPage: 100,
+		},
+	}
+
+	return &GithubCodeHost{client, options}
 }
 
-func (ch *CodeHost) FetchRepository(ctx context.Context, repoURL string) (*analysis.Repository, error) {
-	githubRepository, err := ch.github.fetchRepository(ctx, repoURL)
+func (gc *GithubCodeHost) FetchRepository(ctx context.Context, repoURL string) (*analysis.Repository, error) {
+	githubRepository, err := gc.fetchRepository(ctx, repoURL)
 	if err != nil {
-		return nil, ch.translateGithubError(err)
+		return nil, gc.translateGithubError(err)
 	}
 
 	now := time.Now()
@@ -42,19 +54,19 @@ func (ch *CodeHost) FetchRepository(ctx context.Context, repoURL string) (*analy
 	return repository, nil
 }
 
-func (ch *CodeHost) FetchRepositoryID(ctx context.Context, repoURL string) (int64, error) {
-	githubRepository, err := ch.github.fetchRepository(ctx, repoURL)
+func (gc *GithubCodeHost) FetchRepositoryID(ctx context.Context, repoURL string) (int64, error) {
+	githubRepository, err := gc.fetchRepository(ctx, repoURL)
 	if err != nil {
-		return 0, ch.translateGithubError(err)
+		return 0, gc.translateGithubError(err)
 	}
 
 	return *githubRepository.ID, nil
 }
 
-func (ch *CodeHost) FetchCommit(ctx context.Context, repoURL string, commitSHA string) (*analysis.Commit, error) {
-	githubCommit, err := ch.github.fetchCommit(ctx, repoURL, commitSHA)
+func (gc *GithubCodeHost) FetchCommit(ctx context.Context, repoURL string, commitSHA string) (*analysis.Commit, error) {
+	githubCommit, err := gc.fetchCommit(ctx, repoURL, commitSHA)
 	if err != nil {
-		return nil, ch.translateGithubError(err)
+		return nil, gc.translateGithubError(err)
 	}
 
 	files := []string{}
@@ -62,9 +74,9 @@ func (ch *CodeHost) FetchCommit(ctx context.Context, repoURL string, commitSHA s
 		files = append(files, *file.Filename)
 	}
 
-	repoID, err := ch.FetchRepositoryID(ctx, repoURL)
+	repoID, err := gc.FetchRepositoryID(ctx, repoURL)
 	if err != nil {
-		return nil, ch.translateGithubError(err)
+		return nil, gc.translateGithubError(err)
 	}
 
 	now := time.Now()
@@ -84,10 +96,10 @@ func (ch *CodeHost) FetchCommit(ctx context.Context, repoURL string, commitSHA s
 	}, nil
 }
 
-func (ch *CodeHost) FetchCommitDiff(ctx context.Context, repoURL string, commitSHA string) (string, error) {
-	githubCommit, err := ch.github.fetchCommit(ctx, repoURL, commitSHA)
+func (gc *GithubCodeHost) FetchCommitDiff(ctx context.Context, repoURL string, commitSHA string) (string, error) {
+	githubCommit, err := gc.fetchCommit(ctx, repoURL, commitSHA)
 	if err != nil {
-		return "", ch.translateGithubError(err)
+		return "", gc.translateGithubError(err)
 	}
 
 	diff := ""
@@ -102,19 +114,19 @@ func (ch *CodeHost) FetchCommitDiff(ctx context.Context, repoURL string, commitS
 	return diff, nil
 }
 
-func (ch *CodeHost) ProduceCommitSHAs(ctx context.Context, repoURL string, lastAnalyzedCommitSHA string, commitSHAs chan<- string) (string, error) {
-	repository, err := ch.github.fetchRepository(ctx, repoURL)
+func (gc *GithubCodeHost) ProduceCommitSHAs(ctx context.Context, repoURL string, lastAnalyzedCommitSHA string, commitSHAs chan<- string) (string, error) {
+	repository, err := gc.fetchRepository(ctx, repoURL)
 	if err != nil {
-		return "", ch.translateGithubError(err)
+		return "", gc.translateGithubError(err)
 	}
 
-	ch.github.setCommitOffset(lastAnalyzedCommitSHA)
+	gc.setCommitOffset(lastAnalyzedCommitSHA)
 
 	var newHeadSHA string
 	for {
-		pageCommits, resp, err := ch.github.fetchCommits(ctx, repository)
+		pageCommits, resp, err := gc.fetchCommits(ctx, repository)
 		if err != nil {
-			return "", ch.translateGithubError(err)
+			return "", gc.translateGithubError(err)
 		}
 
 		if newHeadSHA == "" && len(pageCommits) > 0 {
@@ -129,50 +141,29 @@ func (ch *CodeHost) ProduceCommitSHAs(ctx context.Context, repoURL string, lastA
 			break
 		}
 
-		ch.github.nextPage(resp)
+		gc.nextPage(resp)
 	}
 
 	return newHeadSHA, nil
 }
 
-func (ch *CodeHost) translateGithubError(err error) error {
+func (gc *GithubCodeHost) translateGithubError(err error) error {
 	var githubErr *github.ErrorResponse
 	if errors.As(err, &githubErr) {
 		switch githubErr.Response.StatusCode {
 		case 400:
-			return domain.ErrBadRequest
+			return pkg_errors.ErrBadRequest
 		case 404:
-			return domain.ErrNotFound
+			return pkg_errors.ErrNotFound
 		case 401, 403:
-			return domain.ErrUnauthorized
+			return pkg_errors.ErrUnauthorized
 		}
 	}
 
-	return domain.NewError(domain.ErrInternalFailure, err)
+	return pkg_errors.NewError(pkg_errors.ErrInternalFailure, err)
 }
 
-type githubClient struct {
-	client  *github.Client
-	options *github.CommitsListOptions
-}
-
-func newGithubClient(ctx context.Context, accessToken string) *githubClient {
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: accessToken},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
-
-	options := &github.CommitsListOptions{
-		ListOptions: github.ListOptions{
-			PerPage: 100,
-		},
-	}
-
-	return &githubClient{client, options}
-}
-
-func (gc *githubClient) fetchRepository(ctx context.Context, repoURL string) (*github.Repository, error) {
+func (gc *GithubCodeHost) fetchRepository(ctx context.Context, repoURL string) (*github.Repository, error) {
 	owner, repo, err := gc.parseRepoURL(repoURL)
 	if err != nil {
 		return nil, err
@@ -186,7 +177,7 @@ func (gc *githubClient) fetchRepository(ctx context.Context, repoURL string) (*g
 	return githubRepository, nil
 }
 
-func (gc *githubClient) parseRepoURL(repoURL string) (string, string, error) {
+func (gc *GithubCodeHost) parseRepoURL(repoURL string) (string, string, error) {
 	parsedURL, err := url.Parse(repoURL)
 	if err != nil {
 		return "", "", err
@@ -206,15 +197,15 @@ func (gc *githubClient) parseRepoURL(repoURL string) (string, string, error) {
 	return pathParts[0], repoName, nil
 }
 
-func (gc *githubClient) nextPage(resp *github.Response) {
+func (gc *GithubCodeHost) nextPage(resp *github.Response) {
 	gc.options.ListOptions.Page = resp.NextPage
 }
 
-func (gc *githubClient) setCommitOffset(commitSHA string) {
+func (gc *GithubCodeHost) setCommitOffset(commitSHA string) {
 	gc.options.SHA = commitSHA
 }
 
-func (gc *githubClient) fetchCommits(ctx context.Context, repository *github.Repository) ([]*github.RepositoryCommit, *github.Response, error) {
+func (gc *GithubCodeHost) fetchCommits(ctx context.Context, repository *github.Repository) ([]*github.RepositoryCommit, *github.Response, error) {
 	pageCommits, resp, err := gc.client.Repositories.ListCommits(ctx, *repository.Owner.Login, *repository.Name, gc.options)
 	if err != nil {
 		return nil, nil, err
@@ -222,7 +213,7 @@ func (gc *githubClient) fetchCommits(ctx context.Context, repository *github.Rep
 	return pageCommits, resp, nil
 }
 
-func (gc *githubClient) fetchCommit(ctx context.Context, repoURL string, commitSHA string) (*github.RepositoryCommit, error) {
+func (gc *GithubCodeHost) fetchCommit(ctx context.Context, repoURL string, commitSHA string) (*github.RepositoryCommit, error) {
 	githubRepository, err := gc.fetchRepository(ctx, repoURL)
 	if err != nil {
 		return nil, err

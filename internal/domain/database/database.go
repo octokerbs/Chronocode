@@ -1,4 +1,4 @@
-package persistency
+package database
 
 import (
 	"context"

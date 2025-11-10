@@ -5,17 +5,18 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/octokerbs/chronocode-backend/internal/domain"
 	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
 	"github.com/octokerbs/chronocode-backend/internal/domain/codehost"
-	"github.com/octokerbs/chronocode-backend/internal/domain/persistency"
+	"github.com/octokerbs/chronocode-backend/internal/domain/database"
+	pkg_errors "github.com/octokerbs/chronocode-backend/pkg/errors"
+	"github.com/octokerbs/chronocode-backend/pkg/log"
 )
 
-type RepositoryAnalyzer struct {
-	Agent           analysis.Agent
-	CodeHostFactory codehost.CodeHostFactory
-	Database        persistency.Database
-	Log             domain.Logger
+type RepositoryAnalyzerService struct {
+	agent           analysis.Agent
+	codeHostFactory codehost.CodeHostFactory
+	database        database.Database
+	log             log.Logger
 
 	newHeadMutex sync.Mutex
 	newHeadSHA   string
@@ -25,24 +26,24 @@ func NewRepositoryAnalyzer(
 	ctx context.Context,
 	agent analysis.Agent,
 	codehostFactory codehost.CodeHostFactory,
-	database persistency.Database,
-	log domain.Logger,
-) *RepositoryAnalyzer {
-	ra := &RepositoryAnalyzer{
-		Agent:           agent,
-		CodeHostFactory: codehostFactory,
-		Database:        database,
-		Log:             log.With("service", "RepositoryAnalyzer"),
+	database database.Database,
+	log log.Logger,
+) *RepositoryAnalyzerService {
+	ra := &RepositoryAnalyzerService{
+		agent:           agent,
+		codeHostFactory: codehostFactory,
+		database:        database,
+		log:             log.With("service", "RepositoryAnalyzer"),
 	}
 
 	return ra
 }
 
-func (ras *RepositoryAnalyzer) PrepareAnalysis(ctx context.Context, repoURL string, accessToken string) (*analysis.Repository, codehost.CodeHost, error) {
-	log := ras.Log.With("repoURL", repoURL)
+func (ras *RepositoryAnalyzerService) PrepareAnalysis(ctx context.Context, repoURL string, accessToken string) (*analysis.Repository, codehost.CodeHost, error) {
+	log := ras.log.With("repoURL", repoURL)
 	log.Info("Preparing repository analysis")
 
-	codeHost := ras.CodeHostFactory.Create(ctx, accessToken)
+	codeHost := ras.codeHostFactory.Create(ctx, accessToken)
 
 	repo, err := ras.fetchOrCreateRepository(ctx, repoURL, codeHost, log)
 	if err != nil {
@@ -55,8 +56,8 @@ func (ras *RepositoryAnalyzer) PrepareAnalysis(ctx context.Context, repoURL stri
 	return repo, codeHost, nil
 }
 
-func (ras *RepositoryAnalyzer) RunAnalysis(ctx context.Context, repo *analysis.Repository, codeHost codehost.CodeHost) error {
-	log := ras.Log.With("repoURL", repo.URL, "repoID", repo.ID)
+func (ras *RepositoryAnalyzerService) RunAnalysis(ctx context.Context, repo *analysis.Repository, codeHost codehost.CodeHost) error {
+	log := ras.log.With("repoURL", repo.URL, "repoID", repo.ID)
 	log.Info("Starting background analysis")
 
 	ras.clean()
@@ -76,7 +77,7 @@ func (ras *RepositoryAnalyzer) RunAnalysis(ctx context.Context, repo *analysis.R
 		go ras.commitAnalyzerWorker(ctx, repo.URL, codeHost, commitSHAs, commits, &wgAnalyzers, workerLog)
 	}
 
-	log.Info("Starting persistency workers", "workerCount", numPersistencyWorkers)
+	log.Info("Starting database workers", "workerCount", numPersistencyWorkers)
 	for i := 0; i < numPersistencyWorkers; i++ {
 		wgPersistency.Add(1)
 		workerLog := log.With("persistencyWorkerID", i)
@@ -113,7 +114,7 @@ func (ras *RepositoryAnalyzer) RunAnalysis(ctx context.Context, repo *analysis.R
 	if newHeadSHA != "" && newHeadSHA != repo.LastAnalyzedCommit {
 		log.Info("Updating repository's last analyzed commit", "lastCommitSHA", newHeadSHA)
 		repo.UpdateLastAnalyzedCommit(newHeadSHA)
-		if err := ras.Database.StoreRepository(ctx, repo); err != nil {
+		if err := ras.database.StoreRepository(ctx, repo); err != nil {
 			log.Error("Failed to update repository with last analyzed commit", err)
 			return err
 		}
@@ -127,13 +128,13 @@ func (ras *RepositoryAnalyzer) RunAnalysis(ctx context.Context, repo *analysis.R
 	return nil
 }
 
-func (ras *RepositoryAnalyzer) clean() {
+func (ras *RepositoryAnalyzerService) clean() {
 	ras.newHeadMutex.Lock()
 	ras.newHeadSHA = "" // Reset for this run
 	ras.newHeadMutex.Unlock()
 }
 
-func (ras *RepositoryAnalyzer) fetchOrCreateRepository(ctx context.Context, repoURL string, codeHost codehost.CodeHost, log domain.Logger) (*analysis.Repository, error) {
+func (ras *RepositoryAnalyzerService) fetchOrCreateRepository(ctx context.Context, repoURL string, codeHost codehost.CodeHost, log log.Logger) (*analysis.Repository, error) {
 	fetchedRepository, err := codeHost.FetchRepository(ctx, repoURL)
 	if err != nil {
 		log.Error("Failed to fetch repository from code host", err)
@@ -142,39 +143,39 @@ func (ras *RepositoryAnalyzer) fetchOrCreateRepository(ctx context.Context, repo
 
 	log = log.With("repoID", fetchedRepository.ID)
 
-	repo, err := ras.Database.GetRepository(ctx, fetchedRepository.ID)
+	repo, err := ras.database.GetRepository(ctx, fetchedRepository.ID)
 	if err == nil {
 		log.Info("Repository found in Database")
 		return repo, nil
 	}
 
-	if !errors.Is(err, domain.ErrNotFound) {
+	if !errors.Is(err, pkg_errors.ErrNotFound) {
 		return nil, err // Maybe a server error
 	}
 
 	log.Info("Repository not in Database, storing new repository in database")
-	if err := ras.Database.StoreRepository(ctx, fetchedRepository); err != nil {
-		log.Error("Failed to persistency new repository in database", err)
+	if err := ras.database.StoreRepository(ctx, fetchedRepository); err != nil {
+		log.Error("Failed to database new repository in database", err)
 		return nil, err
 	}
 
-	repo, err = ras.Database.GetRepository(ctx, fetchedRepository.ID)
+	repo, err = ras.database.GetRepository(ctx, fetchedRepository.ID)
 	if err != nil {
-		log.Error("Failed to persistency new repository in database", err)
+		log.Error("Failed to database new repository in database", err)
 		return nil, err
 	}
 
 	return repo, nil
 }
 
-func (ras *RepositoryAnalyzer) commitAnalyzerWorker(
+func (ras *RepositoryAnalyzerService) commitAnalyzerWorker(
 	ctx context.Context,
 	repoURL string,
 	codeHost codehost.CodeHost,
 	commitSHAs <-chan string,
 	commits chan<- *analysis.Commit,
 	wg *sync.WaitGroup,
-	log domain.Logger,
+	log log.Logger,
 ) {
 	defer func() {
 		wg.Done()
@@ -189,7 +190,7 @@ func (ras *RepositoryAnalyzer) commitAnalyzerWorker(
 			continue
 		}
 
-		analysis, err := ras.Agent.AnalyzeCommitDiff(ctx, diff)
+		analysis, err := ras.agent.AnalyzeCommitDiff(ctx, diff)
 		if err != nil {
 			commitLog.Warn("Failed to analyze commit diff, skipping commit", err)
 			continue
@@ -207,14 +208,14 @@ func (ras *RepositoryAnalyzer) commitAnalyzerWorker(
 	}
 }
 
-func (ras *RepositoryAnalyzer) commitPersistencyWorker(ctx context.Context, commits <-chan *analysis.Commit, wg *sync.WaitGroup, log domain.Logger) {
+func (ras *RepositoryAnalyzerService) commitPersistencyWorker(ctx context.Context, commits <-chan *analysis.Commit, wg *sync.WaitGroup, log log.Logger) {
 	defer func() {
 		wg.Done()
 	}()
 
 	for commit := range commits {
-		if err := ras.Database.StoreCommit(ctx, commit); err != nil {
-			log.Error("Failed to persistency commit in database", err)
+		if err := ras.database.StoreCommit(ctx, commit); err != nil {
+			log.Error("Failed to database commit in database", err)
 			continue
 		}
 	}

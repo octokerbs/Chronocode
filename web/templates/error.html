@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error en la Aplicación</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+</head>
+
+<body class="bg-gray-100 font-sans flex items-center justify-center min-h-screen">
+
+    <div class="max-w-md w-full p-8 bg-white rounded-lg shadow-xl border-t-4 border-red-600">
+        <div class="text-center">
+            <svg class="mx-auto h-12 w-12 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.3 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <h1 class="text-3xl font-bold mt-4 text-gray-900">Error en el Servidor</h1>
+        </div>
+
+        <div class="mt-6 bg-red-50 p-4 rounded-md border border-red-200">
+            <p class="text-red-700 font-semibold mb-2">Detalles del Error:</p>
+            <p class="text-red-600 italic">
+                {{if .Message}}
+                {{.Message}}
+                {{else}}
+                Ocurrió un error inesperado. Por favor, inténtalo de nuevo.
+                {{end}}
+            </p>
+        </div>
+
+        <div class="mt-6 text-center">
+            <a href="/" class="text-blue-600 hover:text-blue-800 font-medium transition duration-150 ease-in-out">
+                Volver a la página principal
+            </a>
+        </div>
+    </div>
+
+</body>
+
+</html>

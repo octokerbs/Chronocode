@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/octokerbs/chronocode-backend/internal/domain"
+	pkg_errors "github.com/octokerbs/chronocode-backend/pkg/errors"
 )
 
 type APIError struct {
@@ -14,14 +14,14 @@ type APIError struct {
 
 func FromError(err error) APIError {
 	var apiError APIError
-	var svcError domain.Error
+	var svcError pkg_errors.Error
 
 	if errors.As(err, &svcError) {
 		svcErr := svcError.Category()
 		switch svcErr {
-		case domain.ErrBadRequest:
+		case pkg_errors.ErrBadRequest:
 			apiError.Status = http.StatusBadRequest
-		case domain.ErrInternalFailure:
+		case pkg_errors.ErrInternalFailure:
 			apiError.Status = http.StatusInternalServerError
 		}
 		apiError.Message = svcError.Specific().Error()

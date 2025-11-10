@@ -5,32 +5,34 @@ import (
 	"encoding/json"
 
 	"github.com/google/generative-ai-go/genai"
-	"github.com/octokerbs/chronocode-backend/internal/domain"
 	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
+	"github.com/octokerbs/chronocode-backend/pkg/errors"
 	"google.golang.org/api/option"
 )
 
-type Agent struct {
-	gemini *geminiClient
+type GeminiAgent struct {
+	client *genai.Client
+	model  *genai.GenerativeModel
 }
 
-func NewGeminiAgent(ctx context.Context, apiKey string) (*Agent, error) {
-	gemini, err := newgeminiClient(ctx, apiKey)
+func NewGeminiAgent(ctx context.Context, key string) (*GeminiAgent, error) {
+	client, err := genai.NewClient(ctx, option.WithAPIKey(key))
 	if err != nil {
 		return nil, err
 	}
-
-	return &Agent{gemini}, nil
+	model := client.GenerativeModel("gemini-2.0-flash")
+	model.ResponseMIMEType = "application/json"
+	return &GeminiAgent{client: client, model: model}, nil
 }
 
-func (a *Agent) AnalyzeCommitDiff(ctx context.Context, diff string) (analysis.CommitAnalysis, error) {
+func (ga *GeminiAgent) AnalyzeCommitDiff(ctx context.Context, diff string) (analysis.CommitAnalysis, error) {
 	tries := 3
-	prompt := a.gemini.commitAnalysisPrompt() + diff
+	prompt := ga.commitAnalysisPrompt() + diff
 
 	var text []byte
 	var err error
 	for tries > 0 {
-		text, err = a.gemini.generateStructuredContent(ctx, prompt, a.gemini.commitAnalysisSchema())
+		text, err = ga.generateStructuredContent(ctx, prompt, ga.commitAnalysisSchema())
 		if err == nil {
 			break
 		}
@@ -38,44 +40,29 @@ func (a *Agent) AnalyzeCommitDiff(ctx context.Context, diff string) (analysis.Co
 	}
 
 	if err != nil {
-		return analysis.CommitAnalysis{}, domain.NewError(domain.ErrInternalFailure, err)
+		return analysis.CommitAnalysis{}, errors.NewError(errors.ErrInternalFailure, err)
 	}
 
 	var commitAnalysis analysis.CommitAnalysis
 	if err := json.Unmarshal(text, &commitAnalysis); err != nil {
-		return analysis.CommitAnalysis{}, domain.NewError(domain.ErrInternalFailure, err)
+		return analysis.CommitAnalysis{}, errors.NewError(errors.ErrInternalFailure, err)
 	}
 
 	return commitAnalysis, nil
 }
 
-type geminiClient struct {
-	client *genai.Client
-	model  *genai.GenerativeModel
-}
-
-func newgeminiClient(ctx context.Context, key string) (*geminiClient, error) {
-	client, err := genai.NewClient(ctx, option.WithAPIKey(key))
-	if err != nil {
-		return nil, err
-	}
-	model := client.GenerativeModel("gemini-2.0-flash")
-	model.ResponseMIMEType = "application/json"
-	return &geminiClient{client: client, model: model}, nil
-}
-
-func (gc *geminiClient) commitAnalysisSchema() *genai.Schema {
+func (ga *GeminiAgent) commitAnalysisSchema() *genai.Schema {
 	return &genai.Schema{
 		Type: genai.TypeObject,
 		Properties: map[string]*genai.Schema{
-			"commit":     gc.commitSchema(),
-			"subcommits": gc.subcommitsSchema(),
+			"commit":     ga.commitSchema(),
+			"subcommits": ga.subcommitsSchema(),
 		},
 		Required: []string{"commit", "subcommits"},
 	}
 }
 
-func (gc *geminiClient) commitSchema() *genai.Schema {
+func (ga *GeminiAgent) commitSchema() *genai.Schema {
 	return &genai.Schema{
 		Type: genai.TypeObject,
 		Properties: map[string]*genai.Schema{
@@ -89,15 +76,15 @@ func (gc *geminiClient) commitSchema() *genai.Schema {
 	}
 }
 
-func (gc *geminiClient) subcommitsSchema() *genai.Schema {
+func (ga *GeminiAgent) subcommitsSchema() *genai.Schema {
 	return &genai.Schema{
 		Type:        genai.TypeArray,
-		Items:       gc.subcommitSchema(),
+		Items:       ga.subcommitSchema(),
 		Description: "An array of logical units of work that make up this commit.",
 	}
 }
 
-func (gc *geminiClient) subcommitSchema() *genai.Schema {
+func (ga *GeminiAgent) subcommitSchema() *genai.Schema {
 	return &genai.Schema{
 		Type: genai.TypeObject,
 		Properties: map[string]*genai.Schema{
@@ -134,7 +121,7 @@ func (gc *geminiClient) subcommitSchema() *genai.Schema {
 	}
 }
 
-func (gc *geminiClient) commitAnalysisPrompt() string {
+func (ga *GeminiAgent) commitAnalysisPrompt() string {
 	return `
 	You are a Commit Expert Analyzer specializing in code analysis and software development patterns.
 	You will receive a Git Commit diff.
@@ -145,10 +132,10 @@ func (gc *geminiClient) commitAnalysisPrompt() string {
 	`
 }
 
-func (gc *geminiClient) generateStructuredContent(ctx context.Context, prompt string, schema *genai.Schema) ([]byte, error) {
-	gc.model.ResponseSchema = schema
+func (ga *GeminiAgent) generateStructuredContent(ctx context.Context, prompt string, schema *genai.Schema) ([]byte, error) {
+	ga.model.ResponseSchema = schema
 
-	resp, err := gc.model.GenerateContent(ctx, genai.Text(prompt))
+	resp, err := ga.model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
 		return nil, err
 	}

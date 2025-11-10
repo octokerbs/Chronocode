@@ -9,26 +9,28 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/octokerbs/chronocode-backend/config"
-	"github.com/octokerbs/chronocode-backend/internal/api/http"
+	"github.com/octokerbs/chronocode-backend/internal/application/analysis"
+	"github.com/octokerbs/chronocode-backend/internal/application/identity"
+	"github.com/octokerbs/chronocode-backend/internal/application/query"
+	"github.com/octokerbs/chronocode-backend/internal/config"
+	"github.com/octokerbs/chronocode-backend/internal/delivery/http"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/agent/gemini"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/codehost/githubapi"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/database/postgres"
+	"github.com/octokerbs/chronocode-backend/internal/infrastructure/identity/githubauth"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/logging/zap"
-	"github.com/octokerbs/chronocode-backend/internal/service/analysis"
-	"github.com/octokerbs/chronocode-backend/internal/service/query"
 )
 
 func main() {
 	ctx := context.Background()
 	_ = godotenv.Load()
 
-	cfg, err := config.NewHTTPConfig()
+	cfg, err := config.NewConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	logger, err := zap.NewLogger()
+	logger, err := zap.NewZapLogger()
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
@@ -43,7 +45,15 @@ func main() {
 		logger.Error("Failed to initialize gemini agent", err)
 	}
 
-	codeHostFactory := githubapi.NewGitHubFactory()
+	githubProvider := githubauth.NewGitHubAuthenticationProvider(
+		cfg.GithubClientID,
+		cfg.GithubClientSecret,
+		cfg.RedirectURL,
+	)
+
+	authService := identity.NewAuthService(githubProvider)
+
+	codeHostFactory := githubapi.NewGitHubCodeHostFactory()
 
 	repositoryAnalyzer := analysis.NewRepositoryAnalyzer(
 		ctx,
@@ -58,14 +68,13 @@ func main() {
 		logger,
 	)
 
-	server := http.NewHTTPServer(repositoryAnalyzer, querier, cfg.Port, logger)
+	server := http.NewHTTPServer(repositoryAnalyzer, querier, authService, ":8080", logger)
 
-	// Graceful termination
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM) // Listen for Ctrl+C and Kubernetes/Docker signals
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		logger.Info("Starting server", "port", cfg.Port)
+		logger.Info("Starting server", "port", "8080:8080")
 		if err := server.Run(); err != nil {
 			logger.Fatal("Server failed to run", err)
 		}

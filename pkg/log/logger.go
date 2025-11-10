@@ -1,4 +1,4 @@
-package domain
+package log
 
 type Logger interface {
 	Info(msg string, keysAndValues ...interface{})

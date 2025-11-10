@@ -1,44 +1,9 @@
 package zap
 
 import (
-	"github.com/octokerbs/chronocode-backend/internal/domain"
+	"github.com/octokerbs/chronocode-backend/pkg/log"
 	"go.uber.org/zap"
 )
-
-type Logger struct {
-	zapLogger *ZapLogger
-}
-
-func NewLogger() (*Logger, error) {
-	logger, err := NewZapLogger()
-	if err != nil {
-		return nil, err
-	}
-	return &Logger{zapLogger: logger}, nil
-}
-
-func (l *Logger) Info(msg string, keysAndValues ...interface{}) {
-	l.zapLogger.sugaredLogger.Infow(msg, keysAndValues...)
-}
-
-func (l *Logger) Warn(msg string, err error, keysAndValues ...interface{}) {
-	allArgs := append(keysAndValues, "error", err)
-	l.zapLogger.sugaredLogger.Warnw(msg, allArgs...)
-}
-
-func (l *Logger) Error(msg string, err error, keysAndValues ...interface{}) {
-	allArgs := append(keysAndValues, "error", err)
-	l.zapLogger.sugaredLogger.Errorw(msg, allArgs...)
-}
-
-func (l *Logger) Fatal(msg string, err error, keysAndValues ...interface{}) {
-	allArgs := append(keysAndValues, "error", err)
-	l.zapLogger.sugaredLogger.Fatalw(msg, allArgs...)
-}
-
-func (l *Logger) With(keysAndValues ...interface{}) domain.Logger {
-	return &Logger{zapLogger: l.zapLogger.With(keysAndValues...)}
-}
 
 type ZapLogger struct {
 	sugaredLogger *zap.SugaredLogger
@@ -55,7 +20,26 @@ func NewZapLogger() (*ZapLogger, error) {
 	return &ZapLogger{sugaredLogger: sugaredLogger}, nil
 }
 
-func (zl *ZapLogger) With(keysAndValues ...interface{}) *ZapLogger {
+func (zl *ZapLogger) Info(msg string, keysAndValues ...interface{}) {
+	zl.sugaredLogger.Infow(msg, keysAndValues...)
+}
+
+func (zl *ZapLogger) Warn(msg string, err error, keysAndValues ...interface{}) {
+	allArgs := append(keysAndValues, "error", err)
+	zl.sugaredLogger.Warnw(msg, allArgs...)
+}
+
+func (zl *ZapLogger) Error(msg string, err error, keysAndValues ...interface{}) {
+	allArgs := append(keysAndValues, "error", err)
+	zl.sugaredLogger.Errorw(msg, allArgs...)
+}
+
+func (zl *ZapLogger) Fatal(msg string, err error, keysAndValues ...interface{}) {
+	allArgs := append(keysAndValues, "error", err)
+	zl.sugaredLogger.Fatalw(msg, allArgs...)
+}
+
+func (zl *ZapLogger) With(keysAndValues ...interface{}) log.Logger {
 	newSugaredLogger := zl.sugaredLogger.With(keysAndValues...)
 	return &ZapLogger{sugaredLogger: newSugaredLogger}
 }

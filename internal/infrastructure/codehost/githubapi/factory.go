@@ -6,13 +6,13 @@ import (
 	"github.com/octokerbs/chronocode-backend/internal/domain/codehost"
 )
 
-type GitHubFactory struct {
+type GitHubCodeHostFactory struct {
 }
 
-func NewGitHubFactory() *GitHubFactory {
-	return &GitHubFactory{}
+func NewGitHubCodeHostFactory() *GitHubCodeHostFactory {
+	return &GitHubCodeHostFactory{}
 }
 
-func (f *GitHubFactory) Create(ctx context.Context, accessToken string) codehost.CodeHost {
+func (f *GitHubCodeHostFactory) Create(ctx context.Context, accessToken string) codehost.CodeHost {
 	return NewGithubCodeHost(ctx, accessToken)
 }
