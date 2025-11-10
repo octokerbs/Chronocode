@@ -3,7 +3,6 @@
     <p>{{.Message}}</p>
 </div>
 
-<h2 class="text-2xl font-semibold mb-4 text-gray-800">Subcommits Recientes:</h2>
 <div hx-get="/subcommits-timeline" hx-trigger="load, refreshTimeline from body" hx-swap="outerHTML"
     class="subcommits-container">
     Cargando subcommits actualizados...

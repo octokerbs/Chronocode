@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chronocode Analyzer</title>
+    <title>Chronocode </title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
 </head>
@@ -15,11 +15,11 @@
     <div class="container mx-auto mt-10 p-8 bg-white rounded-xl shadow-2xl max-w-4xl">
         <header class="text-center mb-10">
             <h1 class="text-4xl font-extrabold text-gray-900 tracking-tight">
-                Chronocode Analyzer
+                Chronocode
             </h1>
-            <p class="text-lg text-gray-600 mt-2">Análisis de Repositorios con Estándares de Expertos</p>
         </header>
 
+        <!-- Logged in sucessfully, can analyze repos -->>
         {{if .IsLoggedIn}}
 
         <div class="mb-8 text-center bg-green-50 p-3 rounded-lg border border-green-200">
@@ -35,7 +35,7 @@
                 </label>
                 <input type="url" id="repoUrl" name="repoUrl"
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-800 focus:ring-blue-500 focus:border-blue-500 transition duration-150"
-                    placeholder="Ej: https://github.com/octokerbs/chronocode-backend" required>
+                    placeholder="e. g. https://github.com/octokerbs/chronocode-backend" required>
             </div>
 
             <button type="button" hx-post="/analyze" hx-target="#analysis-results-container" hx-swap="outerHTML"
@@ -54,6 +54,7 @@
             </div>
         </div>
 
+        <!-- Not logged in -->
         {{else}}
         <div class="text-center p-10 bg-indigo-50 rounded-xl shadow-inner border border-indigo-200">
             <svg class="mx-auto h-16 w-16 text-indigo-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
