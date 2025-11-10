@@ -14,12 +14,12 @@ import (
 )
 
 type AnalysisHandler struct {
-	Analyzer *analysis.Analyzer
+	Analyzer *analysis.RepositoryAnalyzer
 	Querier  *query.Querier
 	logger   domain.Logger
 }
 
-func NewAnalysisHandler(analyzer *analysis.Analyzer, querier *query.Querier, logger domain.Logger) *AnalysisHandler {
+func NewAnalysisHandler(analyzer *analysis.RepositoryAnalyzer, querier *query.Querier, logger domain.Logger) *AnalysisHandler {
 	return &AnalysisHandler{
 		Analyzer: analyzer,
 		Querier:  querier,

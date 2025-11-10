@@ -16,7 +16,7 @@ type HTTPServer struct {
 	server *http.Server
 }
 
-func NewHTTPServer(analyzer *analysis.Analyzer, querier *query.Querier, port string, logger domain.Logger) *HTTPServer {
+func NewHTTPServer(analyzer *analysis.RepositoryAnalyzer, querier *query.Querier, port string, logger domain.Logger) *HTTPServer {
 	engine := gin.Default()
 
 	analysisHandler := http_analysis.NewAnalysisHandler(analyzer, querier, logger)

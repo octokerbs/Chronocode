@@ -6,15 +6,15 @@ import (
 
 	"github.com/octokerbs/chronocode-backend/internal/domain"
 	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
-	"github.com/octokerbs/chronocode-backend/internal/domain/store"
+	"github.com/octokerbs/chronocode-backend/internal/domain/persistency"
 )
 
 type Querier struct {
-	db     store.Database
+	db     persistency.Database
 	logger domain.Logger
 }
 
-func NewQuerier(db store.Database, logger domain.Logger) *Querier {
+func NewQuerier(db persistency.Database, logger domain.Logger) *Querier {
 	return &Querier{
 		db:     db,
 		logger: logger,
