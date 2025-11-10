@@ -40,12 +40,23 @@ func NewHTTPServer(analyzer *application_analysis.RepositoryAnalyzerService, que
 	return s
 }
 
+func (s *HTTPServer) Run() error {
+	if err := s.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
+}
+
+func (s *HTTPServer) Shutdown(ctx context.Context) error {
+	return s.server.Shutdown(ctx)
+}
+
 func (s *HTTPServer) registerPublicRoutes(engine *gin.Engine, logger log.Logger) {
 	authHandler := http_identity.NewAuthHandler(s.authService, logger)
 
-	engine.GET("/", authHandler.RenderHomePage)
-	engine.GET("/auth/github/login", authHandler.GithubLogin)
-	engine.GET("/auth/github/callback", authHandler.GithubCallback)
+	engine.GET("/", s.renderHomePage)
+	engine.GET("/auth/github/login", authHandler.Login)
+	engine.GET("/auth/github/callback", authHandler.LoginCallback)
 }
 
 func (s *HTTPServer) registerAuthenticatedRoutes(engine *gin.Engine, analyzer *application_analysis.RepositoryAnalyzerService, querier *query.QuerierService, logger log.Logger) {
@@ -63,7 +74,7 @@ func (s *HTTPServer) registerAuthenticatedRoutes(engine *gin.Engine, analyzer *a
 // Middleware simple para verificar si el usuario tiene un token
 func (s *HTTPServer) authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		token, err := c.Cookie("github_access_token")
+		token, err := c.Cookie("access_token")
 		if err != nil || token == "" {
 			c.Redirect(http.StatusTemporaryRedirect, "/auth/github/login")
 			c.Abort()
@@ -74,13 +85,10 @@ func (s *HTTPServer) authMiddleware() gin.HandlerFunc {
 	}
 }
 
-func (s *HTTPServer) Run() error {
-	if err := s.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return err
-	}
-	return nil
-}
-
-func (s *HTTPServer) Shutdown(ctx context.Context) error {
-	return s.server.Shutdown(ctx)
+func (s *HTTPServer) renderHomePage(c *gin.Context) {
+	_, err := c.Cookie("access_token")
+	loggedIn := err == nil
+	c.HTML(http.StatusOK, "index.html", gin.H{
+		"IsLoggedIn": loggedIn,
+	})
 }

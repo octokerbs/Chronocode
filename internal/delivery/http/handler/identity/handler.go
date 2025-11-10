@@ -21,33 +21,25 @@ func NewAuthHandler(authService *identity.AuthService, logger log.Logger) *AuthH
 	}
 }
 
-func (h *AuthHandler) GithubLogin(c *gin.Context) {
+func (h *AuthHandler) Login(c *gin.Context) {
 	url := h.authService.GetLoginURL()
 	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
-func (h *AuthHandler) GithubCallback(c *gin.Context) {
+func (h *AuthHandler) LoginCallback(c *gin.Context) {
 	state := c.Query("state")
 	code := c.Query("code")
 
 	accessToken, err := h.authService.HandleCallback(c.Request.Context(), state, code)
 	if err != nil {
-		h.logger.Error("GitHub authentication failed: %v", err)
+		h.logger.Error("authentication failed: %v", err)
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
 	// Lógica de HTTP: Establecer la cookie
-	c.SetCookie("github_access_token", accessToken, int(time.Hour*24*7/time.Second), "/", "localhost", false, true)
-	h.logger.Info("Successfully logged in with GitHub.")
+	c.SetCookie("access_token", accessToken, int(time.Hour*24*7/time.Second), "/", "localhost", false, true)
+	h.logger.Info("Successfully logged in with Auth.")
 
 	c.Redirect(http.StatusTemporaryRedirect, "/")
-}
-
-func (h *AuthHandler) RenderHomePage(c *gin.Context) {
-	_, err := c.Cookie("github_access_token")
-	loggedIn := err == nil
-	c.HTML(http.StatusOK, "index.html", gin.H{
-		"IsLoggedIn": loggedIn,
-	})
 }

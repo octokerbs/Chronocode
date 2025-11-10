@@ -5,26 +5,26 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/octokerbs/chronocode-backend/internal/infrastructure/identity/githubauth"
+	"github.com/octokerbs/chronocode-backend/internal/domain/identity"
 )
 
 const OAuthStateString = "secure-random-string-for-security"
 
 type AuthService struct {
-	githubProvider *githubauth.GitHubAuthenticationProvider
+	auth identity.Auth
 }
 
-func NewAuthService(provider *githubauth.GitHubAuthenticationProvider) *AuthService {
+func NewAuthService(auth identity.Auth) *AuthService {
 	return &AuthService{
-		githubProvider: provider,
+		auth,
 	}
 }
 
 func (s *AuthService) GetLoginURL() string {
-	return s.githubProvider.GetAuthURL(OAuthStateString)
+	return s.auth.GetAuthURL(OAuthStateString)
 }
 
-func (s *AuthService) HandleCallback(ctx context.Context, state string, code string) (accessToken string, err error) {
+func (s *AuthService) HandleCallback(ctx context.Context, state string, code string) (string, error) {
 	if state != OAuthStateString {
 		return "", errors.New("oauth state mismatch")
 	}
@@ -33,7 +33,7 @@ func (s *AuthService) HandleCallback(ctx context.Context, state string, code str
 		return "", errors.New("authorization code not found")
 	}
 
-	token, err := s.githubProvider.ExchangeCode(ctx, code)
+	token, err := s.auth.ExchangeCode(ctx, code)
 	if err != nil {
 		return "", fmt.Errorf("failed to exchange code for token: %w", err)
 	}

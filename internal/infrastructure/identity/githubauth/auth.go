@@ -7,11 +7,11 @@ import (
 	githuboauth "golang.org/x/oauth2/github"
 )
 
-type GitHubAuthenticationProvider struct {
+type GitHubAuth struct {
 	config *oauth2.Config
 }
 
-func NewGitHubAuthenticationProvider(clientID, clientSecret, redirectURL string) *GitHubAuthenticationProvider {
+func NewGitHubAuthenticationProvider(clientID, clientSecret, redirectURL string) *GitHubAuth {
 	config := &oauth2.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
@@ -19,13 +19,13 @@ func NewGitHubAuthenticationProvider(clientID, clientSecret, redirectURL string)
 		Scopes:       []string{"repo", "read:org", "user:email"},
 		Endpoint:     githuboauth.Endpoint,
 	}
-	return &GitHubAuthenticationProvider{config: config}
+	return &GitHubAuth{config: config}
 }
 
-func (a *GitHubAuthenticationProvider) GetAuthURL(state string) string {
+func (a *GitHubAuth) GetAuthURL(state string) string {
 	return a.config.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
 }
 
-func (a *GitHubAuthenticationProvider) ExchangeCode(ctx context.Context, code string) (*oauth2.Token, error) {
+func (a *GitHubAuth) ExchangeCode(ctx context.Context, code string) (*oauth2.Token, error) {
 	return a.config.Exchange(ctx, code)
 }
