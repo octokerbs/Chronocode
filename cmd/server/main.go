@@ -22,14 +22,45 @@ import (
 )
 
 func main() {
+	// Load configs
 	ctx := context.Background()
 	_ = godotenv.Load()
-
 	cfg, err := config.NewConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
+	// Build dependencies
+	repositoryAnalyzer, querier, authService, logger := buildDependencies(ctx, cfg)
+	server := http.NewHTTPServer(repositoryAnalyzer, querier, authService, ":8080", logger)
+
+	// Server start
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		logger.Info("Starting server", "port", "8080:8080")
+		if err := server.Run(); err != nil {
+			logger.Fatal("Server failed to run", err)
+		}
+	}()
+
+	<-quit
+
+	// Server shutdown
+	logger.Info("Shutting down server...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Error("Server forced to shutdown", err)
+	}
+
+	logger.Info("Server exited gracefully.")
+}
+
+func buildDependencies(ctx context.Context, cfg *config.Config) (*analysis.RepositoryAnalyzerService, *query.QuerierService, *identity.AuthService, *zap.ZapLogger) {
 	logger, err := zap.NewZapLogger()
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
@@ -55,6 +86,11 @@ func main() {
 
 	codeHostFactory := githubapi.NewGitHubCodeHostFactory()
 
+	querier := query.NewQuerier(
+		db,
+		logger,
+	)
+
 	repositoryAnalyzer := analysis.NewRepositoryAnalyzer(
 		ctx,
 		agent,
@@ -63,34 +99,5 @@ func main() {
 		logger,
 	)
 
-	querier := query.NewQuerier(
-		db,
-		logger,
-	)
-
-	server := http.NewHTTPServer(repositoryAnalyzer, querier, authService, ":8080", logger)
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		logger.Info("Starting server", "port", "8080:8080")
-		if err := server.Run(); err != nil {
-			logger.Fatal("Server failed to run", err)
-		}
-	}()
-
-	<-quit
-	logger.Info("Shutting down server...")
-
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		logger.Error("Server forced to shutdown", err)
-	}
-
-	logger.Info("Server exited gracefully.")
-
-	server.Run()
+	return repositoryAnalyzer, querier, authService, logger
 }
