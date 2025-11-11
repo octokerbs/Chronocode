@@ -67,7 +67,7 @@ func (ras *RepositoryAnalyzerService) RunAnalysis(ctx context.Context, repo *ana
 
 	var wgAnalyzers sync.WaitGroup
 	var wgPersistency sync.WaitGroup
-	const numAnalyzerWorkers = 20
+	const numAnalyzerWorkers = 5
 	const numPersistencyWorkers = 40
 
 	log.Info("Starting commit analysis workers", "workerCount", numAnalyzerWorkers)

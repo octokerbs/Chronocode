@@ -53,6 +53,7 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		return
 	}
 
+	repoID := repo.ID
 	go func() {
 		analysisCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
@@ -64,5 +65,8 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		}
 	}()
 
-	c.HTML(http.StatusAccepted, "analysis_status.html", gin.H{"message": "Repository analysis has been queued."})
+	c.HTML(http.StatusAccepted, "analysis_status.html", gin.H{
+		"Message": "Análisis del repositorio iniciado. Cargando línea de tiempo...",
+		"RepoID":  repoID,
+	})
 }

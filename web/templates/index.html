@@ -19,7 +19,7 @@
             </h1>
         </header>
 
-        <!-- Logged in sucessfully, can analyze repos -->>
+        <!-- Logged in sucessfully, can analyze repos -->
         {{if .IsLoggedIn}}
 
         <div class="mb-8 text-center bg-green-50 p-3 rounded-lg border border-green-200">
@@ -46,12 +46,6 @@
         </form>
 
         <div id="analysis-results-container" class="mt-8">
-            <h2 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">Timeline de Subcommits</h2>
-
-            <div hx-get="/subcommits-timeline" hx-trigger="load" hx-swap="outerHTML"
-                class="subcommits-timeline-content bg-gray-50 p-4 rounded-lg border border-gray-200">
-                Cargando subcommits...
-            </div>
         </div>
 
         <!-- Not logged in -->

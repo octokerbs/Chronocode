@@ -22,11 +22,10 @@ type Commit struct {
 func (c *Commit) ApplyAnalysis(analysis *CommitAnalysis) {
 	c.Description = analysis.Commit.Description
 
-	now := time.Now()
 	subcommits := analysis.Subcommits
 
 	for i := range subcommits {
-		subcommits[i].ApplyAnalysis(c.SHA, &now)
+		subcommits[i].ApplyAnalysis(c.SHA, c.CreatedAt)
 		c.Subcommits = append(c.Subcommits, &subcommits[i])
 	}
 }

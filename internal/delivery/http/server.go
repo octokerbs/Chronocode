@@ -67,7 +67,7 @@ func (s *HTTPServer) registerAuthenticatedRoutes(engine *gin.Engine, analyzer *a
 		authenticated.POST("/analyze", analysisHandler.AnalyzeRepository)
 
 		querierHandler := http_querier.NewQuerierHandler(querier, logger)
-		authenticated.GET("/subcommits-timeline", querierHandler.GetSubcommits())
+		authenticated.GET("/subcommits-timeline", querierHandler.GetSubcommits)
 	}
 }
 
