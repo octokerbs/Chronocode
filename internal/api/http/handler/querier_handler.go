@@ -1,20 +1,20 @@
-package query
+package handler
 
 import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/octokerbs/chronocode-backend/internal/application/query"
-	"github.com/octokerbs/chronocode-backend/internal/delivery/http/handler"
-	"github.com/octokerbs/chronocode-backend/pkg/log"
+
+	"github.com/octokerbs/chronocode-backend/internal/application"
+	"github.com/octokerbs/chronocode-backend/internal/log"
 )
 
 type QuerierHandler struct {
-	Querier *query.QuerierService
+	Querier *application.Querier
 	logger  log.Logger
 }
 
-func NewQuerierHandler(querier *query.QuerierService, logger log.Logger) *QuerierHandler {
+func NewQuerierHandler(querier *application.Querier, logger log.Logger) *QuerierHandler {
 	return &QuerierHandler{
 		Querier: querier,
 		logger:  logger,
@@ -30,7 +30,7 @@ func (q *QuerierHandler) GetSubcommits(c *gin.Context) {
 
 	subcommits, err := q.Querier.GetSubcommitsFromRepo(c.Request.Context(), repoID)
 	if err != nil {
-		httpErr := handler.FromError(err)
+		httpErr := FromError(err)
 		c.HTML(httpErr.Status, "error.html", gin.H{"message": httpErr.Message})
 		return
 	}

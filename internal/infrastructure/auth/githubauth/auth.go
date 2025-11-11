@@ -11,7 +11,7 @@ type GitHubAuth struct {
 	config *oauth2.Config
 }
 
-func NewGitHubAuthenticationProvider(clientID, clientSecret, redirectURL string) *GitHubAuth {
+func NewGitHubAuth(clientID, clientSecret, redirectURL string) *GitHubAuth {
 	config := &oauth2.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,

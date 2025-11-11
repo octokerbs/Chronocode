@@ -9,15 +9,13 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/octokerbs/chronocode-backend/internal/application/analysis"
-	"github.com/octokerbs/chronocode-backend/internal/application/identity"
-	"github.com/octokerbs/chronocode-backend/internal/application/query"
+	"github.com/octokerbs/chronocode-backend/internal/api/http"
+	"github.com/octokerbs/chronocode-backend/internal/application"
 	"github.com/octokerbs/chronocode-backend/internal/config"
-	"github.com/octokerbs/chronocode-backend/internal/delivery/http"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/agent/gemini"
+	"github.com/octokerbs/chronocode-backend/internal/infrastructure/auth/githubauth"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/codehost/githubapi"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/database/postgres"
-	"github.com/octokerbs/chronocode-backend/internal/infrastructure/identity/githubauth"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/logging/zap"
 )
 
@@ -60,7 +58,7 @@ func main() {
 	logger.Info("Server exited gracefully.")
 }
 
-func buildDependencies(ctx context.Context, cfg *config.Config) (*analysis.RepositoryAnalyzerService, *query.QuerierService, *identity.AuthService, *zap.ZapLogger) {
+func buildDependencies(ctx context.Context, cfg *config.Config) (*application.Analyzer, *application.Querier, *application.Auth, *zap.ZapLogger) {
 	logger, err := zap.NewZapLogger()
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
@@ -76,22 +74,22 @@ func buildDependencies(ctx context.Context, cfg *config.Config) (*analysis.Repos
 		logger.Error("Failed to initialize gemini agent", err)
 	}
 
-	githubProvider := githubauth.NewGitHubAuthenticationProvider(
+	githubAuth := githubauth.NewGitHubAuth(
 		cfg.GithubClientID,
 		cfg.GithubClientSecret,
 		cfg.RedirectURL,
 	)
 
-	authService := identity.NewAuthService(githubProvider)
+	auth := application.NewAuth(githubAuth)
 
 	codeHostFactory := githubapi.NewGitHubCodeHostFactory()
 
-	querier := query.NewQuerier(
+	querier := application.NewQuerier(
 		db,
 		logger,
 	)
 
-	repositoryAnalyzer := analysis.NewRepositoryAnalyzer(
+	analyzer := application.NewAnalyzer(
 		ctx,
 		agent,
 		codeHostFactory,
@@ -99,5 +97,5 @@ func buildDependencies(ctx context.Context, cfg *config.Config) (*analysis.Repos
 		logger,
 	)
 
-	return repositoryAnalyzer, querier, authService, logger
+	return analyzer, querier, auth, logger
 }

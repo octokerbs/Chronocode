@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	pkg_errors "github.com/octokerbs/chronocode-backend/pkg/errors"
+	pkg_errors "github.com/octokerbs/chronocode-backend/internal/errors"
 )
 
 type APIError struct {

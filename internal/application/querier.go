@@ -1,4 +1,4 @@
-package query
+package application
 
 import (
 	"context"
@@ -6,23 +6,23 @@ import (
 
 	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
 	"github.com/octokerbs/chronocode-backend/internal/domain/database"
-	"github.com/octokerbs/chronocode-backend/pkg/errors"
-	"github.com/octokerbs/chronocode-backend/pkg/log"
+	"github.com/octokerbs/chronocode-backend/internal/errors"
+	"github.com/octokerbs/chronocode-backend/internal/log"
 )
 
-type QuerierService struct {
+type Querier struct {
 	db     database.Database
 	logger log.Logger
 }
 
-func NewQuerier(db database.Database, logger log.Logger) *QuerierService {
-	return &QuerierService{
+func NewQuerier(db database.Database, logger log.Logger) *Querier {
+	return &Querier{
 		db:     db,
 		logger: logger,
 	}
 }
 
-func (ts *QuerierService) GetSubcommitsFromRepo(ctx context.Context, repoIDStr string) ([]*analysis.Subcommit, error) {
+func (ts *Querier) GetSubcommitsFromRepo(ctx context.Context, repoIDStr string) ([]*analysis.Subcommit, error) {
 	log := ts.logger.With("repoID", repoIDStr)
 
 	repoID, err := strconv.ParseInt(repoIDStr, 10, 64)

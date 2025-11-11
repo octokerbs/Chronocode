@@ -1,7 +1,7 @@
 package zap
 
 import (
-	"github.com/octokerbs/chronocode-backend/pkg/log"
+	"github.com/octokerbs/chronocode-backend/internal/log"
 	"go.uber.org/zap"
 )
 

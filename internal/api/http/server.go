@@ -6,21 +6,16 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	application_analysis "github.com/octokerbs/chronocode-backend/internal/application/analysis"
-	application_identity "github.com/octokerbs/chronocode-backend/internal/application/identity"
-	"github.com/octokerbs/chronocode-backend/internal/application/query"
-	http_analysis "github.com/octokerbs/chronocode-backend/internal/delivery/http/handler/analysis"
-	http_identity "github.com/octokerbs/chronocode-backend/internal/delivery/http/handler/identity"
-	http_querier "github.com/octokerbs/chronocode-backend/internal/delivery/http/handler/query"
-	"github.com/octokerbs/chronocode-backend/pkg/log"
+	"github.com/octokerbs/chronocode-backend/internal/api/http/handler"
+	"github.com/octokerbs/chronocode-backend/internal/application"
+	"github.com/octokerbs/chronocode-backend/internal/log"
 )
 
 type HTTPServer struct {
-	server      *http.Server
-	authService *application_identity.AuthService
+	server *http.Server
 }
 
-func NewHTTPServer(analyzer *application_analysis.RepositoryAnalyzerService, querier *query.QuerierService, authService *application_identity.AuthService, port string, logger log.Logger) *HTTPServer {
+func NewHTTPServer(analyzer *application.Analyzer, querier *application.Querier, auth *application.Auth, port string, logger log.Logger) *HTTPServer {
 	engine := gin.Default()
 	engine.LoadHTMLGlob("web/templates/*")
 
@@ -30,11 +25,10 @@ func NewHTTPServer(analyzer *application_analysis.RepositoryAnalyzerService, que
 	}
 
 	s := &HTTPServer{
-		server:      server,
-		authService: authService,
+		server: server,
 	}
 
-	s.registerPublicRoutes(engine, logger)
+	s.registerPublicRoutes(engine, auth, logger)
 	s.registerAuthenticatedRoutes(engine, analyzer, querier, logger)
 
 	return s
@@ -51,22 +45,22 @@ func (s *HTTPServer) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
 
-func (s *HTTPServer) registerPublicRoutes(engine *gin.Engine, logger log.Logger) {
-	authHandler := http_identity.NewAuthHandler(s.authService, logger)
-
+func (s *HTTPServer) registerPublicRoutes(engine *gin.Engine, auth *application.Auth, logger log.Logger) {
 	engine.GET("/", s.renderHomePage)
+
+	authHandler := handler.NewAuthHandler(auth, logger)
 	engine.GET("/auth/github/login", authHandler.Login)
 	engine.GET("/auth/github/callback", authHandler.LoginCallback)
 }
 
-func (s *HTTPServer) registerAuthenticatedRoutes(engine *gin.Engine, analyzer *application_analysis.RepositoryAnalyzerService, querier *query.QuerierService, logger log.Logger) {
+func (s *HTTPServer) registerAuthenticatedRoutes(engine *gin.Engine, analyzer *application.Analyzer, querier *application.Querier, logger log.Logger) {
 	authenticated := engine.Group("/")
 	authenticated.Use(s.authMiddleware())
 	{
-		analysisHandler := http_analysis.NewAnalysisHandler(analyzer, logger)
+		analysisHandler := handler.NewAnalyzerHandler(analyzer, logger)
 		authenticated.POST("/analyze", analysisHandler.AnalyzeRepository)
 
-		querierHandler := http_querier.NewQuerierHandler(querier, logger)
+		querierHandler := handler.NewQuerierHandler(querier, logger)
 		authenticated.GET("/subcommits-timeline", querierHandler.GetSubcommits)
 	}
 }

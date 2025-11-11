@@ -1,4 +1,4 @@
-package analysis
+package handler
 
 import (
 	"context"
@@ -7,24 +7,23 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/octokerbs/chronocode-backend/internal/application/analysis"
-	"github.com/octokerbs/chronocode-backend/internal/delivery/http/handler"
-	"github.com/octokerbs/chronocode-backend/pkg/log"
+	"github.com/octokerbs/chronocode-backend/internal/application"
+	"github.com/octokerbs/chronocode-backend/internal/log"
 )
 
-type AnalysisHandler struct {
-	Analyzer *analysis.RepositoryAnalyzerService
+type AnalyzerHandler struct {
+	analyzer *application.Analyzer
 	logger   log.Logger
 }
 
-func NewAnalysisHandler(analyzer *analysis.RepositoryAnalyzerService, logger log.Logger) *AnalysisHandler {
-	return &AnalysisHandler{
-		Analyzer: analyzer,
+func NewAnalyzerHandler(analyzer *application.Analyzer, logger log.Logger) *AnalyzerHandler {
+	return &AnalyzerHandler{
+		analyzer: analyzer,
 		logger:   logger,
 	}
 }
 
-func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
+func (h *AnalyzerHandler) AnalyzeRepository(c *gin.Context) {
 	token, exists := c.Get("githubToken")
 	if !exists {
 		h.logger.Error("Bad request", fmt.Errorf("github token does not exist: %s", token))
@@ -40,9 +39,9 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		return
 	}
 
-	repo, codeHost, err := h.Analyzer.PrepareAnalysis(c.Request.Context(), repoURL, githubToken)
+	repo, codeHost, err := h.analyzer.PrepareAnalysis(c.Request.Context(), repoURL, githubToken)
 	if err != nil {
-		httpErr := handler.FromError(err)
+		httpErr := FromError(err)
 
 		if httpErr.Status == 0 { // Empty status indicates internal server error
 			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"message": httpErr.Message})
@@ -58,7 +57,7 @@ func (h *AnalysisHandler) AnalyzeRepository(c *gin.Context) {
 		analysisCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
 
-		if err := h.Analyzer.RunAnalysis(analysisCtx, repo, codeHost); err != nil {
+		if err := h.analyzer.RunAnalysis(analysisCtx, repo, codeHost); err != nil {
 			h.logger.Error("Background analysis failed", err, "repoURL", repoURL)
 		} else {
 			h.logger.Info("Background analysis complete", "repoURL", repoURL)

@@ -1,28 +1,28 @@
-package identity
+package handler
 
 import (
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/octokerbs/chronocode-backend/internal/application/identity"
-	"github.com/octokerbs/chronocode-backend/pkg/log"
+	"github.com/octokerbs/chronocode-backend/internal/application"
+	"github.com/octokerbs/chronocode-backend/internal/log"
 )
 
 type AuthHandler struct {
-	authService *identity.AuthService
-	logger      log.Logger
+	auth   *application.Auth
+	logger log.Logger
 }
 
-func NewAuthHandler(authService *identity.AuthService, logger log.Logger) *AuthHandler {
+func NewAuthHandler(authService *application.Auth, logger log.Logger) *AuthHandler {
 	return &AuthHandler{
-		authService: authService,
-		logger:      logger,
+		auth:   authService,
+		logger: logger,
 	}
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
-	url := h.authService.GetLoginURL()
+	url := h.auth.GetLoginURL()
 	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
@@ -30,7 +30,7 @@ func (h *AuthHandler) LoginCallback(c *gin.Context) {
 	state := c.Query("state")
 	code := c.Query("code")
 
-	accessToken, err := h.authService.HandleCallback(c.Request.Context(), state, code)
+	accessToken, err := h.auth.HandleCallback(c.Request.Context(), state, code)
 	if err != nil {
 		h.logger.Error("authentication failed: %v", err)
 		c.AbortWithStatus(http.StatusUnauthorized)
