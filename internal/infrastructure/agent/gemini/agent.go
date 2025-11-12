@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
-	"github.com/octokerbs/chronocode-backend/pkg/errors"
+	"github.com/octokerbs/chronocode-backend/internal/errors"
 	"google.golang.org/api/option"
 )
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
-	pkg_errors "github.com/octokerbs/chronocode-backend/pkg/errors"
+	pkg_errors "github.com/octokerbs/chronocode-backend/internal/errors"
 )
 
 type PostgresDatabase struct {
