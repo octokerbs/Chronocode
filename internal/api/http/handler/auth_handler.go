@@ -6,18 +6,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/octokerbs/chronocode-backend/internal/application"
-	"github.com/octokerbs/chronocode-backend/internal/log"
 )
 
 type AuthHandler struct {
-	auth   *application.Auth
-	logger log.Logger
+	auth *application.Auth
 }
 
-func NewAuthHandler(authService *application.Auth, logger log.Logger) *AuthHandler {
+func NewAuthHandler(authService *application.Auth) *AuthHandler {
 	return &AuthHandler{
-		auth:   authService,
-		logger: logger,
+		auth: authService,
 	}
 }
 
@@ -32,14 +29,11 @@ func (h *AuthHandler) LoginCallback(c *gin.Context) {
 
 	accessToken, err := h.auth.HandleCallback(c.Request.Context(), state, code)
 	if err != nil {
-		h.logger.Error("authentication failed: %v", err)
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
-	// Lógica de HTTP: Establecer la cookie
 	c.SetCookie("access_token", accessToken, int(time.Hour*24*7/time.Second), "/", "localhost", false, true)
-	h.logger.Info("Successfully logged in with Auth.")
 
 	c.Redirect(http.StatusTemporaryRedirect, "/")
 }

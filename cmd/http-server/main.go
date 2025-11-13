@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -9,18 +10,17 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/octokerbs/chronocode-backend/config"
 	"github.com/octokerbs/chronocode-backend/internal/api/http"
 	"github.com/octokerbs/chronocode-backend/internal/application"
-	"github.com/octokerbs/chronocode-backend/internal/config"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/agent/gemini"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/auth/githubauth"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/codehost/githubapi"
 	"github.com/octokerbs/chronocode-backend/internal/infrastructure/database/postgres"
-	"github.com/octokerbs/chronocode-backend/internal/infrastructure/logging/zap"
+	"go.uber.org/zap"
 )
 
 func main() {
-	// Load configs
 	ctx := context.Background()
 	_ = godotenv.Load()
 	cfg, err := config.NewConfig()
@@ -28,50 +28,41 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Build dependencies
-	repositoryAnalyzer, querier, authService, logger := buildDependencies(ctx, cfg)
-	server := http.NewHTTPServer(repositoryAnalyzer, querier, authService, ":8080", logger)
+	repositoryAnalyzer, persistCommits, prepareRepo, querier, authService := buildDependencies(ctx, cfg)
+	server := http.NewHTTPServer(repositoryAnalyzer, persistCommits, prepareRepo, querier, authService, ":8080")
 
-	// Server start
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		logger.Info("Starting server", "port", "8080:8080")
 		if err := server.Run(); err != nil {
-			logger.Fatal("Server failed to run", err)
+			fmt.Printf("Server failed to start: %e", err)
 		}
 	}()
 
 	<-quit
 
-	// Server shutdown
-	logger.Info("Shutting down server...")
-
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		logger.Error("Server forced to shutdown", err)
 	}
-
-	logger.Info("Server exited gracefully.")
 }
 
-func buildDependencies(ctx context.Context, cfg *config.Config) (*application.Analyzer, *application.Querier, *application.Auth, *zap.ZapLogger) {
-	logger, err := zap.NewZapLogger()
+func buildDependencies(ctx context.Context, cfg *config.Config) (*application.Analyzer, *application.PersistCommits, *application.PrepareRepository, *application.Querier, *application.Auth) {
+	logger, err := zap.NewProduction()
 	if err != nil {
-		log.Fatalf("Failed to initialize logger: %v", err)
+		panic("Error building logger")
 	}
 
 	db, err := postgres.NewPostgresDatabase(cfg.DatabaseURL)
 	if err != nil {
-		logger.Error("Failed to initialize database", err)
+		logger.Fatal("Couldn't initialize postgres db", zap.String("buildDependencies", err.Error()))
 	}
 
 	agent, err := gemini.NewGeminiAgent(ctx, cfg.GeminiAPIKey)
 	if err != nil {
-		logger.Error("Failed to initialize gemini agent", err)
+		logger.Fatal("Couldn't initialize postgres gemini agent", zap.String("buildDependencies", err.Error()))
 	}
 
 	githubAuth := githubauth.NewGitHubAuth(
@@ -86,16 +77,15 @@ func buildDependencies(ctx context.Context, cfg *config.Config) (*application.An
 
 	querier := application.NewQuerier(
 		db,
-		logger,
 	)
 
 	analyzer := application.NewAnalyzer(
-		ctx,
 		agent,
 		codeHostFactory,
-		db,
-		logger,
 	)
 
-	return analyzer, querier, auth, logger
+	persistCommits := &application.PersistCommits{Database: db}
+	prepareRepo := &application.PrepareRepository{CodeHostFactory: codeHostFactory, Database: db}
+
+	return analyzer, persistCommits, prepareRepo, querier, auth
 }

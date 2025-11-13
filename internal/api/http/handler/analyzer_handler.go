@@ -2,70 +2,55 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/octokerbs/chronocode-backend/internal/application"
-	"github.com/octokerbs/chronocode-backend/internal/log"
 )
 
 type AnalyzerHandler struct {
-	analyzer *application.Analyzer
-	logger   log.Logger
+	prepareRepo    *application.PrepareRepository
+	analyzer       *application.Analyzer
+	persistCommits *application.PersistCommits
 }
 
-func NewAnalyzerHandler(analyzer *application.Analyzer, logger log.Logger) *AnalyzerHandler {
+func NewAnalyzerHandler(prepareRepo *application.PrepareRepository, analyzer *application.Analyzer, persistCommits *application.PersistCommits) *AnalyzerHandler {
 	return &AnalyzerHandler{
-		analyzer: analyzer,
-		logger:   logger,
+		prepareRepo:    prepareRepo,
+		analyzer:       analyzer,
+		persistCommits: persistCommits,
 	}
 }
 
 func (h *AnalyzerHandler) AnalyzeRepository(c *gin.Context) {
-	token, exists := c.Get("githubToken")
-	if !exists {
-		h.logger.Error("Bad request", fmt.Errorf("github token does not exist: %s", token))
-		c.HTML(http.StatusUnauthorized, "error.html", gin.H{"Message": "Unauthorized. Please, login again."})
+	token := c.Query("github_token")
+	if token == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"Message": "Unauthorized. Please, login again."})
 		return
 	}
-	githubToken := token.(string)
 
-	repoURL := c.PostForm("repoUrl")
+	repoURL := c.Query("repo_url")
 	if repoURL == "" {
-		h.logger.Error("Bad request", fmt.Errorf("empty repo_url"))
-		c.HTML(http.StatusBadRequest, "error.html", gin.H{"Message": "URL del repositorio es requerida."})
+		c.JSON(http.StatusBadRequest, gin.H{"Message": "Empty repository name."})
 		return
 	}
 
-	repo, codeHost, err := h.analyzer.PrepareAnalysis(c.Request.Context(), repoURL, githubToken)
+	repo, err := h.prepareRepo.Execute(c.Request.Context(), repoURL, token)
 	if err != nil {
-		httpErr := FromError(err)
-
-		if httpErr.Status == 0 { // Empty status indicates internal server error
-			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"message": httpErr.Message})
-			return
-		}
-
-		c.HTML(httpErr.Status, "error.html", gin.H{"Message": httpErr.Message})
+		c.JSON(http.StatusBadRequest, gin.H{"Message": "URL del repositorio es requerida."})
 		return
 	}
 
-	repoID := repo.ID
-	go func() {
-		analysisCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-		defer cancel()
+	events := make(chan application.CommitAnalyzed, 100)
+	go h.persistCommits.HandleCommitAnalyzed(context.Background(), events)
 
-		if err := h.analyzer.RunAnalysis(analysisCtx, repo, codeHost); err != nil {
-			h.logger.Error("Background analysis failed", err, "repoURL", repoURL)
-		} else {
-			h.logger.Info("Background analysis complete", "repoURL", repoURL)
-		}
+	go func() {
+		defer close(events)
+		h.analyzer.AnalyzeCommits(context.Background(), repo, events, token)
 	}()
 
-	c.HTML(http.StatusAccepted, "analysis_status.html", gin.H{
+	c.JSON(http.StatusAccepted, gin.H{
 		"Message": "Análisis del repositorio iniciado. Cargando línea de tiempo...",
-		"RepoID":  repoID,
+		"RepoID":  repo.ID,
 	})
 }
