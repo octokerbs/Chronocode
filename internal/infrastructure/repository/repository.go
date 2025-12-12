@@ -1,0 +1,12 @@
+package repository
+
+//CREATE TABLE IF NOT EXISTS repository (
+//id BIGSERIAL PRIMARY KEY,
+//created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+//name VARCHAR(255) NOT NULL,
+//url TEXT NOT NULL UNIQUE,
+//last_analyzed_commit VARCHAR(40)
+//);
+
+type repository struct {
+}

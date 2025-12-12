@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/octokerbs/chronocode-backend/internal/domain/database"
+	"github.com/octokerbs/chronocode-backend/internal/domain"
 )
 
 type PersistCommits struct {
-	Database database.Database
+	Database domain.Database
 }
 
 func (pc *PersistCommits) HandleCommitAnalyzed(ctx context.Context, events <-chan CommitAnalyzed) error {

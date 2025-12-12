@@ -4,18 +4,17 @@ import (
 	"context"
 	"errors"
 
-	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
+	"github.com/octokerbs/chronocode-backend/internal/domain"
 	"github.com/octokerbs/chronocode-backend/internal/domain/codehost"
-	"github.com/octokerbs/chronocode-backend/internal/domain/database"
 	pkg_errors "github.com/octokerbs/chronocode-backend/internal/errors"
 )
 
 type PrepareRepository struct {
 	CodeHostFactory codehost.CodeHostFactory
-	Database        database.Database
+	Database        domain.Database
 }
 
-func (pr *PrepareRepository) Execute(ctx context.Context, repoURL, accessToken string) (*analysis.Repository, error) {
+func (pr *PrepareRepository) Execute(ctx context.Context, repoURL, accessToken string) (*domain.Repository, error) {
 	codeHost := pr.CodeHostFactory.Create(ctx, accessToken)
 
 	fetchedRepo, err := codeHost.FetchRepository(ctx, repoURL)

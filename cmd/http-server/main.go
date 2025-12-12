@@ -13,10 +13,9 @@ import (
 	"github.com/octokerbs/chronocode-backend/config"
 	"github.com/octokerbs/chronocode-backend/internal/api/http"
 	"github.com/octokerbs/chronocode-backend/internal/application"
-	"github.com/octokerbs/chronocode-backend/internal/infrastructure/agent/gemini"
-	"github.com/octokerbs/chronocode-backend/internal/infrastructure/auth/githubauth"
-	"github.com/octokerbs/chronocode-backend/internal/infrastructure/codehost/githubapi"
-	"github.com/octokerbs/chronocode-backend/internal/infrastructure/database/postgres"
+	"github.com/octokerbs/chronocode-backend/internal/infrastructure/agent"
+	"github.com/octokerbs/chronocode-backend/internal/infrastructure/codehost"
+	"github.com/octokerbs/chronocode-backend/internal/infrastructure/repository/postgres"
 	"go.uber.org/zap"
 )
 
@@ -60,12 +59,12 @@ func buildDependencies(ctx context.Context, cfg *config.Config) (*application.An
 		logger.Fatal("Couldn't initialize postgres db", zap.String("buildDependencies", err.Error()))
 	}
 
-	agent, err := gemini.NewGeminiAgent(ctx, cfg.GeminiAPIKey)
+	agent, err := agent.NewGeminiAgent(ctx, cfg.GeminiAPIKey)
 	if err != nil {
 		logger.Fatal("Couldn't initialize postgres gemini agent", zap.String("buildDependencies", err.Error()))
 	}
 
-	githubAuth := githubauth.NewGitHubAuth(
+	githubAuth := codehost.NewGitHubAuth(
 		cfg.GithubClientID,
 		cfg.GithubClientSecret,
 		cfg.RedirectURL,
@@ -73,7 +72,7 @@ func buildDependencies(ctx context.Context, cfg *config.Config) (*application.An
 
 	auth := application.NewAuth(githubAuth)
 
-	codeHostFactory := githubapi.NewGitHubCodeHostFactory()
+	codeHostFactory := codehost.NewGitHubCodeHostFactory()
 
 	querier := application.NewQuerier(
 		db,

@@ -48,7 +48,6 @@ func (s *HTTPServer) Shutdown(ctx context.Context) error {
 }
 
 func (s *HTTPServer) registerPublicRoutes(engine *gin.Engine, auth *application.Auth) {
-	engine.GET("/", s.renderHomePage)
 
 	authHandler := handler.NewAuthHandler(auth)
 	engine.GET("/auth/github/login", authHandler.Login)
@@ -76,12 +75,4 @@ func (s *HTTPServer) authMiddleware() gin.HandlerFunc {
 		c.Set("githubToken", token) // Pasa el token al contexto de Gin
 		c.Next()
 	}
-}
-
-func (s *HTTPServer) renderHomePage(c *gin.Context) {
-	_, err := c.Cookie("access_token")
-	loggedIn := err == nil
-	c.JSON(http.StatusOK, gin.H{
-		"IsLoggedIn": loggedIn,
-	})
 }
