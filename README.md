@@ -7,7 +7,7 @@ This is a port of a project made for the [ShipBA Hackaton 2025](https://www.ship
 </div>
 
 ## Frontend example
-![Demo](assets/Demo.png)
+![Demo](.github/Demo.png)
 
 ## ENV file setup
 ```env
