@@ -1,4 +1,4 @@
-package subcommit
+package repository
 
 import "time"
 

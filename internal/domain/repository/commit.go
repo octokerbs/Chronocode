@@ -1,10 +1,6 @@
-package commit
+package repository
 
-import (
-	"time"
-
-	"github.com/octokerbs/chronocode-backend/internal/domain/subcommit"
-)
+import "time"
 
 type Commit struct {
 	SHA         string
@@ -18,12 +14,12 @@ type Commit struct {
 	AuthorURL   string
 	Files       []string
 	RepoID      int64
-	Subcommits  []*subcommit.Subcommit
+	Subcommits  []*Subcommit
 }
 
 type CommitAnalysis struct {
 	Description string
-	Subcommits  []subcommit.Subcommit
+	Subcommits  []Subcommit
 }
 
 func (c *Commit) ApplyAnalysis(analysis *CommitAnalysis) {

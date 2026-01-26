@@ -1,8 +1,8 @@
-package repo
+package repository
 
 import "time"
 
-type Repository struct {
+type Repo struct {
 	ID                 int64
 	CreatedAt          *time.Time
 	Name               string
@@ -10,6 +10,6 @@ type Repository struct {
 	LastAnalyzedCommit string
 }
 
-func (r *Repository) UpdateLastAnalyzedCommit(commitSHA string) {
+func (r *Repo) UpdateLastAnalyzedCommit(commitSHA string) {
 	r.LastAnalyzedCommit = commitSHA
 }

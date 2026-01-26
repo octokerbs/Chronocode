@@ -6,8 +6,7 @@ import (
 	"errors"
 
 	"github.com/google/generative-ai-go/genai"
-	"github.com/octokerbs/chronocode-backend/internal/domain/commit"
-	"github.com/octokerbs/chronocode-backend/internal/domain/subcommit"
+	"github.com/octokerbs/chronocode-backend/internal/domain/repository"
 	"google.golang.org/api/option"
 )
 
@@ -26,7 +25,7 @@ func NewGeminiAgent(ctx context.Context, key string) (*GeminiAgent, error) {
 	return &GeminiAgent{client: client, model: model}, nil
 }
 
-func (ga *GeminiAgent) AnalyzeCommitDiff(ctx context.Context, diff string) (commit.CommitAnalysis, error) {
+func (ga *GeminiAgent) AnalyzeCommitDiff(ctx context.Context, diff string) (repository.CommitAnalysis, error) {
 	tries := 3
 	prompt := ga.commitAnalysisPrompt() + diff
 
@@ -41,7 +40,7 @@ func (ga *GeminiAgent) AnalyzeCommitDiff(ctx context.Context, diff string) (comm
 	}
 
 	if err != nil {
-		return commit.CommitAnalysis{}, err
+		return repository.CommitAnalysis{}, err
 	}
 
 	var response struct {
@@ -59,15 +58,15 @@ func (ga *GeminiAgent) AnalyzeCommitDiff(ctx context.Context, diff string) (comm
 	}
 
 	if err := json.Unmarshal(text, &response); err != nil {
-		return commit.CommitAnalysis{}, err
+		return repository.CommitAnalysis{}, err
 	}
 
-	analysis := commit.CommitAnalysis{
+	analysis := repository.CommitAnalysis{
 		Description: response.Commit.Description,
 	}
 
 	for _, sc := range response.Subcommits {
-		analysis.Subcommits = append(analysis.Subcommits, subcommit.Subcommit{
+		analysis.Subcommits = append(analysis.Subcommits, repository.Subcommit{
 			Title:       sc.Title,
 			Idea:        sc.Idea,
 			Description: sc.Description,

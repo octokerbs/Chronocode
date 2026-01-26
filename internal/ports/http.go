@@ -1,19 +1,19 @@
 package ports
 
-import "github.com/octokerbs/chronocode-backend/internal/app"
+import (
+	"net/http"
 
-type contextKey string
-
-const githubTokenKey contextKey = "github_token"
+	"github.com/octokerbs/chronocode-backend/internal/app"
+)
 
 type HttpServer struct {
 	app app.Application
 }
 
-func NewHttpServer(application app.Application) HttpServer {
-	return HttpServer{app: application}
+func NewHttpServer(app app.Application) HttpServer {
+	return HttpServer{app}
 }
 
-func (h HttpServer) RunHTTPServer() {
+func (h HttpServer) GetSubcommits(w http.ResponseWriter, r *http.Request) {
 
 }

@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/octokerbs/chronocode-backend/common/logs"
+	"github.com/octokerbs/chronocode-backend/common/server"
 	"github.com/octokerbs/chronocode-backend/internal/ports"
 	"github.com/octokerbs/chronocode-backend/internal/service"
 )
@@ -13,6 +15,10 @@ func main() {
 	ctx := context.Background()
 
 	app := service.NewApplication(ctx, logger)
-	server := ports.NewHttpServer(app)
-	server.RunHTTPServer()
+
+	server.RunHTTPServer(func(mux *http.ServeMux) http.Handler {
+		httpServer := ports.NewHttpServer(app)
+		mux.HandleFunc("/subcommits", httpServer.GetSubcommits)
+		return mux
+	}, logger)
 }

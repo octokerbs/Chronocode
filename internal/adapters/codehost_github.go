@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/google/go-github/github"
-	"github.com/octokerbs/chronocode-backend/internal/domain/commit"
-	"github.com/octokerbs/chronocode-backend/internal/domain/repo"
+
+	"github.com/octokerbs/chronocode-backend/internal/app/command"
+	"github.com/octokerbs/chronocode-backend/internal/domain/repository"
 	"golang.org/x/oauth2"
 )
 
@@ -19,6 +20,17 @@ var (
 	ErrNotFound     = errors.New("not found")
 	ErrUnauthorized = errors.New("unauthorized")
 )
+
+type GitHubCodeHostFactory struct {
+}
+
+func NewGitHubCodeHostFactory() *GitHubCodeHostFactory {
+	return &GitHubCodeHostFactory{}
+}
+
+func (f *GitHubCodeHostFactory) Create(ctx context.Context, accessToken string) command.CodeHost {
+	return NewGithubCodeHost(ctx, accessToken)
+}
 
 type GithubCodeHost struct {
 	client  *github.Client
@@ -41,7 +53,7 @@ func NewGithubCodeHost(ctx context.Context, accessToken string) *GithubCodeHost 
 	return &GithubCodeHost{client, options}
 }
 
-func (gc *GithubCodeHost) FetchRepository(ctx context.Context, repoURL string) (*repo.Repository, error) {
+func (gc *GithubCodeHost) FetchRepository(ctx context.Context, repoURL string) (*repository.Repo, error) {
 	githubRepository, err := gc.fetchRepository(ctx, repoURL)
 	if err != nil {
 		return nil, gc.translateGithubError(err)
@@ -49,7 +61,7 @@ func (gc *GithubCodeHost) FetchRepository(ctx context.Context, repoURL string) (
 
 	now := time.Now()
 
-	repository := &repo.Repository{
+	repository := &repository.Repo{
 		ID:                 *githubRepository.ID,
 		CreatedAt:          &now,
 		Name:               *githubRepository.FullName,
@@ -69,7 +81,7 @@ func (gc *GithubCodeHost) FetchRepositoryID(ctx context.Context, repoURL string)
 	return *githubRepository.ID, nil
 }
 
-func (gc *GithubCodeHost) FetchCommit(ctx context.Context, repoURL string, commitSHA string) (*commit.Commit, error) {
+func (gc *GithubCodeHost) FetchCommit(ctx context.Context, repoURL string, commitSHA string) (*repository.Commit, error) {
 	githubCommit, err := gc.fetchCommit(ctx, repoURL, commitSHA)
 	if err != nil {
 		return nil, gc.translateGithubError(err)
@@ -87,7 +99,7 @@ func (gc *GithubCodeHost) FetchCommit(ctx context.Context, repoURL string, commi
 
 	now := time.Now()
 
-	return &commit.Commit{
+	return &repository.Commit{
 		SHA:         commitSHA,
 		CreatedAt:   &now,
 		Author:      *githubCommit.Commit.Author.Name,

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	_ "github.com/lib/pq"
+	"github.com/octokerbs/chronocode-backend/internal/adapters"
 	"github.com/octokerbs/chronocode-backend/internal/app"
 	"github.com/octokerbs/chronocode-backend/internal/app/command"
 	"github.com/octokerbs/chronocode-backend/internal/app/query"
@@ -23,9 +24,17 @@ func NewApplication(ctx context.Context, logger *zap.Logger) app.Application {
 		panic(err)
 	}
 
+	repoRepository := adapters.NewRepoPostgresRepository(db)
+	agent, err := adapters.NewGeminiAgent(ctx, os.Getenv("GEMINI_API_KEY"))
+	if err != nil {
+		panic(err)
+	}
+
+	codeHostFactory := adapters.NewGitHubCodeHostFactory()
+
 	return app.Application{
 		Commands: app.Commands{
-			AnalyzeRepo: command.NewAnalyzeRepoHandler(logger),
+			AnalyzeRepo: command.NewAnalyzeRepoHandler(repoRepository, agent, codeHostFactory, logger),
 		},
 		Queries: app.Queries{
 			IsRepoAnalyzed: query.NewIsRepoAnalyzedHandler(logger),

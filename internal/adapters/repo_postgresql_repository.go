@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/octokerbs/chronocode-backend/internal/domain/repo"
+	"github.com/octokerbs/chronocode-backend/internal/domain/repository"
 )
 
 type RepoPostgresRepository struct {
@@ -16,13 +16,13 @@ func NewRepoPostgresRepository(db *sql.DB) *RepoPostgresRepository {
 	return &RepoPostgresRepository{db: db}
 }
 
-func (r *RepoPostgresRepository) Get(ctx context.Context, id int64) (*repo.Repository, error) {
+func (r *RepoPostgresRepository) Get(ctx context.Context, id int64) (*repository.Repo, error) {
 	const query = `
 		SELECT id, created_at, name, url, last_analyzed_commit
 		FROM repository
 		WHERE id = $1`
 
-	repository := &repo.Repository{}
+	repository := &repository.Repo{}
 
 	row := r.db.QueryRowContext(ctx, query, id)
 	err := row.Scan(
@@ -43,7 +43,7 @@ func (r *RepoPostgresRepository) Get(ctx context.Context, id int64) (*repo.Repos
 	return repository, nil
 }
 
-func (r *RepoPostgresRepository) Store(ctx context.Context, repository *repo.Repository) error {
+func (r *RepoPostgresRepository) Store(ctx context.Context, repository *repository.Repo) error {
 	const upsertQuery = `
 		INSERT INTO repository (id, created_at, name, url, last_analyzed_commit)
 		VALUES ($1, $2, $3, $4, $5)
