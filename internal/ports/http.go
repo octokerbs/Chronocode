@@ -14,6 +14,10 @@ func NewHttpServer(app app.Application) HttpServer {
 	return HttpServer{app}
 }
 
+func (h HttpServer) AnalyzeRepo(w http.ResponseWriter, r *http.Request) {
+
+}
+
 func (h HttpServer) GetSubcommits(w http.ResponseWriter, r *http.Request) {
 
 }

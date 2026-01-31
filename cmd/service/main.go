@@ -7,14 +7,13 @@ import (
 	"github.com/octokerbs/chronocode-backend/common/logs"
 	"github.com/octokerbs/chronocode-backend/common/server"
 	"github.com/octokerbs/chronocode-backend/internal/ports"
-	"github.com/octokerbs/chronocode-backend/internal/service"
 )
 
 func main() {
 	logger := logs.Init()
 	ctx := context.Background()
 
-	app := service.NewApplication(ctx, logger)
+	app := NewApplication(ctx, logger)
 
 	server.RunHTTPServer(func(mux *http.ServeMux) http.Handler {
 		httpServer := ports.NewHttpServer(app)

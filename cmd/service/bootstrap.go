@@ -1,16 +1,14 @@
-package service
+package main
 
 import (
 	"context"
 	"database/sql"
 	"os"
 
-	_ "github.com/lib/pq"
 	"github.com/octokerbs/chronocode-backend/internal/adapters"
 	"github.com/octokerbs/chronocode-backend/internal/app"
 	"github.com/octokerbs/chronocode-backend/internal/app/command"
 	"github.com/octokerbs/chronocode-backend/internal/app/query"
-
 	"go.uber.org/zap"
 )
 
