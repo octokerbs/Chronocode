@@ -29,7 +29,7 @@ func main() {
 	}
 
 	repositoryAnalyzer, persistCommits, prepareRepo, querier, authService := buildDependencies(ctx, cfg)
-	server := http.NewHTTPServer(repositoryAnalyzer, persistCommits, prepareRepo, querier, authService, ":8080")
+	server := http.NewHTTPServer(repositoryAnalyzer, persistCommits, prepareRepo, querier, authService, ":8080", cfg.FrontendURL)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

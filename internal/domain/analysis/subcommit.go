@@ -5,15 +5,15 @@ import (
 )
 
 type Subcommit struct {
-	ID          int64
-	CreatedAt   *time.Time
-	Title       string
-	Idea        string
-	Description string
-	CommitSHA   string
-	Type        string
-	Epic        string
-	Files       []string
+	ID          int64      `json:"id"`
+	CreatedAt   *time.Time `json:"createdAt"`
+	Title       string     `json:"title"`
+	Idea        string     `json:"idea"`
+	Description string     `json:"description"`
+	CommitSHA   string     `json:"commitSha"`
+	Type        string     `json:"type"`
+	Epic        string     `json:"epic"`
+	Files       []string   `json:"files"`
 }
 
 func (s *Subcommit) ApplyAnalysis(commitSHA string, commitTimeStamp *time.Time) {

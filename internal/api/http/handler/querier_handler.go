@@ -21,24 +21,19 @@ func NewQuerierHandler(querier *application.Querier) *QuerierHandler {
 func (q *QuerierHandler) GetSubcommits(c *gin.Context) {
 	repoID := c.Query("repo_id")
 	if repoID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"Message": "Falta el parámetro repoID."})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "repo_id parameter is required"})
 		return
 	}
 
 	subcommits, err := q.Querier.GetSubcommitsFromRepo(c.Request.Context(), repoID)
 	if err != nil {
 		httpErr := FromError(err)
-		c.JSON(httpErr.Status, gin.H{"message": httpErr.Message})
+		c.JSON(httpErr.Status, gin.H{"error": httpErr.Message})
 		return
 	}
 
-	// Eliminar la alerta si se encuentran commits.
-	if len(subcommits) > 0 {
-		c.Header("HX-Trigger", "analysisComplete")
-	}
-
 	c.JSON(http.StatusOK, gin.H{
-		"Subcommits": subcommits,
-		"RepoID":     repoID,
+		"subcommits": subcommits,
+		"repoId":     repoID,
 	})
 }

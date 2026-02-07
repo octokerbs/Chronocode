@@ -4,19 +4,29 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/octokerbs/chronocode-backend/internal/api/http/handler"
 	"github.com/octokerbs/chronocode-backend/internal/application"
 )
 
 type HTTPServer struct {
-	server *http.Server
+	server      *http.Server
+	frontendURL string
 }
 
-func NewHTTPServer(analyzer *application.Analyzer, persistCommits *application.PersistCommits, prepareRepo *application.PrepareRepository, querier *application.Querier, auth *application.Auth, port string) *HTTPServer {
+func NewHTTPServer(analyzer *application.Analyzer, persistCommits *application.PersistCommits, prepareRepo *application.PrepareRepository, querier *application.Querier, auth *application.Auth, port string, frontendURL string) *HTTPServer {
 	engine := gin.Default()
-	engine.LoadHTMLGlob("web/templates/*")
+
+	engine.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{frontendURL},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	server := &http.Server{
 		Addr:    port,
@@ -24,7 +34,8 @@ func NewHTTPServer(analyzer *application.Analyzer, persistCommits *application.P
 	}
 
 	s := &HTTPServer{
-		server: server,
+		server:      server,
+		frontendURL: frontendURL,
 	}
 
 	analysisHandler := handler.NewAnalyzerHandler(prepareRepo, analyzer, persistCommits)
@@ -48,9 +59,9 @@ func (s *HTTPServer) Shutdown(ctx context.Context) error {
 }
 
 func (s *HTTPServer) registerPublicRoutes(engine *gin.Engine, auth *application.Auth) {
-	engine.GET("/", s.renderHomePage)
+	engine.GET("/auth/status", s.authStatus)
 
-	authHandler := handler.NewAuthHandler(auth)
+	authHandler := handler.NewAuthHandler(auth, s.frontendURL)
 	engine.GET("/auth/github/login", authHandler.Login)
 	engine.GET("/auth/github/callback", authHandler.LoginCallback)
 }
@@ -64,24 +75,23 @@ func (s *HTTPServer) registerAuthenticatedRoutes(engine *gin.Engine, analysisHan
 	}
 }
 
-// Middleware simple para verificar si el usuario tiene un token
 func (s *HTTPServer) authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := c.Cookie("access_token")
 		if err != nil || token == "" {
-			c.Redirect(http.StatusTemporaryRedirect, "/auth/github/login")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			c.Abort()
 			return
 		}
-		c.Set("githubToken", token) // Pasa el token al contexto de Gin
+		c.Set("githubToken", token)
 		c.Next()
 	}
 }
 
-func (s *HTTPServer) renderHomePage(c *gin.Context) {
+func (s *HTTPServer) authStatus(c *gin.Context) {
 	_, err := c.Cookie("access_token")
 	loggedIn := err == nil
 	c.JSON(http.StatusOK, gin.H{
-		"IsLoggedIn": loggedIn,
+		"isLoggedIn": loggedIn,
 	})
 }

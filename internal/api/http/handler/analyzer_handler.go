@@ -22,22 +22,28 @@ func NewAnalyzerHandler(prepareRepo *application.PrepareRepository, analyzer *ap
 	}
 }
 
+type analyzeRequest struct {
+	RepoURL string `json:"repoUrl"`
+}
+
 func (h *AnalyzerHandler) AnalyzeRepository(c *gin.Context) {
-	token := c.Query("github_token")
-	if token == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"Message": "Unauthorized. Please, login again."})
+	token, exists := c.Get("githubToken")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	githubToken := token.(string)
+
+	var req analyzeRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.RepoURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "repository URL is required"})
 		return
 	}
 
-	repoURL := c.Query("repo_url")
-	if repoURL == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"Message": "Empty repository name."})
-		return
-	}
-
-	repo, err := h.prepareRepo.Execute(c.Request.Context(), repoURL, token)
+	repo, err := h.prepareRepo.Execute(c.Request.Context(), req.RepoURL, githubToken)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"Message": "URL del repositorio es requerida."})
+		httpErr := FromError(err)
+		c.JSON(httpErr.Status, gin.H{"error": httpErr.Message})
 		return
 	}
 
@@ -46,11 +52,11 @@ func (h *AnalyzerHandler) AnalyzeRepository(c *gin.Context) {
 
 	go func() {
 		defer close(events)
-		h.analyzer.AnalyzeCommits(context.Background(), repo, events, token)
+		h.analyzer.AnalyzeCommits(context.Background(), repo, events, githubToken)
 	}()
 
 	c.JSON(http.StatusAccepted, gin.H{
-		"Message": "Análisis del repositorio iniciado. Cargando línea de tiempo...",
-		"RepoID":  repo.ID,
+		"message": "Repository analysis started. Loading timeline...",
+		"repoId":  repo.ID,
 	})
 }

@@ -5,11 +5,11 @@ import (
 )
 
 type Repository struct {
-	ID                 int64
-	CreatedAt          *time.Time
-	Name               string
-	URL                string
-	LastAnalyzedCommit string
+	ID                 int64      `json:"id"`
+	CreatedAt          *time.Time `json:"createdAt"`
+	Name               string     `json:"name"`
+	URL                string     `json:"url"`
+	LastAnalyzedCommit string     `json:"lastAnalyzedCommit"`
 }
 
 func (r *Repository) UpdateLastAnalyzedCommit(commitSHA string) {

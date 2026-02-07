@@ -9,12 +9,14 @@ import (
 )
 
 type AuthHandler struct {
-	auth *application.Auth
+	auth        *application.Auth
+	frontendURL string
 }
 
-func NewAuthHandler(authService *application.Auth) *AuthHandler {
+func NewAuthHandler(authService *application.Auth, frontendURL string) *AuthHandler {
 	return &AuthHandler{
-		auth: authService,
+		auth:        authService,
+		frontendURL: frontendURL,
 	}
 }
 
@@ -29,11 +31,11 @@ func (h *AuthHandler) LoginCallback(c *gin.Context) {
 
 	accessToken, err := h.auth.HandleCallback(c.Request.Context(), state, code)
 	if err != nil {
-		c.AbortWithStatus(http.StatusUnauthorized)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication failed"})
 		return
 	}
 
-	c.SetCookie("access_token", accessToken, int(time.Hour*24*7/time.Second), "/", "localhost", false, true)
+	c.SetCookie("access_token", accessToken, int(time.Hour*24*7/time.Second), "/", "", false, true)
 
-	c.Redirect(http.StatusTemporaryRedirect, "/")
+	c.Redirect(http.StatusTemporaryRedirect, h.frontendURL)
 }

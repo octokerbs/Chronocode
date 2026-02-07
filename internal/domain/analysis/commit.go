@@ -5,18 +5,18 @@ import (
 )
 
 type Commit struct {
-	SHA         string
-	CreatedAt   *time.Time
-	Author      string
-	Date        string
-	Message     string
-	URL         string
-	AuthorEmail string
-	Description string
-	AuthorURL   string
-	Files       []string
-	RepoID      int64
-	Subcommits  []*Subcommit
+	SHA         string       `json:"sha"`
+	CreatedAt   *time.Time   `json:"createdAt"`
+	Author      string       `json:"author"`
+	Date        string       `json:"date"`
+	Message     string       `json:"message"`
+	URL         string       `json:"url"`
+	AuthorEmail string       `json:"authorEmail"`
+	Description string       `json:"description"`
+	AuthorURL   string       `json:"authorUrl"`
+	Files       []string     `json:"files"`
+	RepoID      int64        `json:"repoId"`
+	Subcommits  []*Subcommit `json:"subcommits"`
 }
 
 func (c *Commit) ApplyAnalysis(analysis *CommitAnalysis) {

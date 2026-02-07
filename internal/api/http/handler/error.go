@@ -17,11 +17,16 @@ func FromError(err error) APIError {
 	var svcError pkg_errors.Error
 
 	if errors.As(err, &svcError) {
-		svcErr := svcError.Category()
-		switch svcErr {
+		switch svcError.Category() {
 		case pkg_errors.ErrBadRequest:
 			apiError.Status = http.StatusBadRequest
+		case pkg_errors.ErrNotFound:
+			apiError.Status = http.StatusNotFound
+		case pkg_errors.ErrUnauthorized:
+			apiError.Status = http.StatusUnauthorized
 		case pkg_errors.ErrInternalFailure:
+			apiError.Status = http.StatusInternalServerError
+		default:
 			apiError.Status = http.StatusInternalServerError
 		}
 		apiError.Message = svcError.Specific().Error()
