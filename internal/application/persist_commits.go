@@ -15,7 +15,7 @@ type PersistCommits struct {
 func (pc *PersistCommits) HandleCommitAnalyzed(ctx context.Context, events <-chan CommitAnalyzed) error {
 	var wg sync.WaitGroup
 
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go pc.persistWorker(ctx, events, &wg)
 	}

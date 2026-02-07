@@ -29,7 +29,7 @@ func NewAnalyzer(agent analysis.Agent, factory codehost.CodeHostFactory) *Analyz
 func (a *Analyzer) AnalyzeCommits(ctx context.Context, repo *analysis.Repository, events chan<- CommitAnalyzed, accessToken string) error {
 	codeHost := a.codeHostFactory.Create(ctx, accessToken)
 
-	commitSHAs := make(chan string)
+	commitSHAs := make(chan string, 100)
 	var wg sync.WaitGroup
 
 	// Workers only analyze and emit events
