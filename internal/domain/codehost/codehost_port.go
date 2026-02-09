@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
+	"github.com/octokerbs/chronocode-backend/internal/domain/user"
 )
 
 type CodeHost interface {
@@ -13,4 +14,7 @@ type CodeHost interface {
 	FetchCommitDiff(ctx context.Context, repoURL string, commitSHA string) (string, error)
 
 	ProduceCommitSHAs(ctx context.Context, repoURL string, lastAnalyzedCommitSHA string, commitSHAs chan<- string) (string, error)
+
+	FetchAuthenticatedUser(ctx context.Context) (*user.GitHubProfile, error)
+	SearchUserRepositories(ctx context.Context, query string) ([]*analysis.Repository, error)
 }

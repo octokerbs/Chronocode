@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/go-github/github"
 	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
+	"github.com/octokerbs/chronocode-backend/internal/domain/user"
 	pkg_errors "github.com/octokerbs/chronocode-backend/internal/errors"
 	"golang.org/x/oauth2"
 )
@@ -145,6 +146,67 @@ func (gc *GithubCodeHost) ProduceCommitSHAs(ctx context.Context, repoURL string,
 	}
 
 	return newHeadSHA, nil
+}
+
+func (gc *GithubCodeHost) FetchAuthenticatedUser(ctx context.Context) (*user.GitHubProfile, error) {
+	ghUser, _, err := gc.client.Users.Get(ctx, "")
+	if err != nil {
+		return nil, gc.translateGithubError(err)
+	}
+
+	profile := &user.GitHubProfile{
+		ID:    *ghUser.ID,
+		Login: *ghUser.Login,
+	}
+
+	if ghUser.Name != nil {
+		profile.Name = *ghUser.Name
+	}
+	if ghUser.AvatarURL != nil {
+		profile.AvatarURL = *ghUser.AvatarURL
+	}
+	if ghUser.Email != nil {
+		profile.Email = *ghUser.Email
+	}
+
+	return profile, nil
+}
+
+func (gc *GithubCodeHost) SearchUserRepositories(ctx context.Context, query string) ([]*analysis.Repository, error) {
+	opts := &github.RepositoryListOptions{
+		Sort:      "updated",
+		Direction: "desc",
+		ListOptions: github.ListOptions{
+			PerPage: 20,
+		},
+	}
+
+	ghRepos, _, err := gc.client.Repositories.List(ctx, "", opts)
+	if err != nil {
+		return nil, gc.translateGithubError(err)
+	}
+
+	queryLower := strings.ToLower(query)
+	var repos []*analysis.Repository
+	for _, r := range ghRepos {
+		if r.FullName == nil {
+			continue
+		}
+		if query == "" || strings.Contains(strings.ToLower(*r.FullName), queryLower) {
+			now := time.Now()
+			repo := &analysis.Repository{
+				ID:        *r.ID,
+				CreatedAt: &now,
+				Name:      *r.FullName,
+			}
+			if r.HTMLURL != nil {
+				repo.URL = *r.HTMLURL
+			}
+			repos = append(repos, repo)
+		}
+	}
+
+	return repos, nil
 }
 
 func (gc *GithubCodeHost) translateGithubError(err error) error {

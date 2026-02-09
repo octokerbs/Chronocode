@@ -18,6 +18,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: chronocode_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # Migracion de base de datos
   migrator:
     image: migrate/migrate:v4.16.2
@@ -39,10 +54,15 @@ services:
       - "8080:8080"
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
+      REDIS_URL: "redis://redis:6379/0"
     depends_on:
       migrator:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local

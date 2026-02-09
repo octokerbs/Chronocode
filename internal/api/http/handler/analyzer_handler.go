@@ -2,23 +2,31 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/octokerbs/chronocode-backend/internal/application"
+	"github.com/octokerbs/chronocode-backend/internal/domain/cache"
+	"github.com/octokerbs/chronocode-backend/internal/domain/codehost"
 )
 
 type AnalyzerHandler struct {
-	prepareRepo    *application.PrepareRepository
-	analyzer       *application.Analyzer
-	persistCommits *application.PersistCommits
+	prepareRepo     *application.PrepareRepository
+	analyzer        *application.Analyzer
+	persistCommits  *application.PersistCommits
+	cache           cache.Cache
+	codeHostFactory codehost.CodeHostFactory
 }
 
-func NewAnalyzerHandler(prepareRepo *application.PrepareRepository, analyzer *application.Analyzer, persistCommits *application.PersistCommits) *AnalyzerHandler {
+func NewAnalyzerHandler(prepareRepo *application.PrepareRepository, analyzer *application.Analyzer, persistCommits *application.PersistCommits, cachePort cache.Cache, codeHostFactory codehost.CodeHostFactory) *AnalyzerHandler {
 	return &AnalyzerHandler{
-		prepareRepo:    prepareRepo,
-		analyzer:       analyzer,
-		persistCommits: persistCommits,
+		prepareRepo:     prepareRepo,
+		analyzer:        analyzer,
+		persistCommits:  persistCommits,
+		cache:           cachePort,
+		codeHostFactory: codeHostFactory,
 	}
 }
 
@@ -53,6 +61,21 @@ func (h *AnalyzerHandler) AnalyzeRepository(c *gin.Context) {
 	go func() {
 		defer close(events)
 		h.analyzer.AnalyzeCommits(context.Background(), repo, events, githubToken)
+	}()
+
+	go func() {
+		ch := h.codeHostFactory.Create(context.Background(), githubToken)
+		profile, err := ch.FetchAuthenticatedUser(context.Background())
+		if err != nil {
+			return
+		}
+		userID := fmt.Sprintf("%d", profile.ID)
+		h.cache.AddUserRepository(context.Background(), userID, cache.UserRepository{
+			ID:      fmt.Sprintf("%d", repo.ID),
+			Name:    repo.Name,
+			URL:     repo.URL,
+			AddedAt: time.Now().Format(time.RFC3339),
+		})
 	}()
 
 	c.JSON(http.StatusAccepted, gin.H{

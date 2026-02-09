@@ -14,6 +14,7 @@ type Config struct {
 	GithubClientSecret string
 	RedirectURL        string
 	FrontendURL        string
+	RedisURL           string
 }
 
 func NewConfig() (*Config, error) {
@@ -26,6 +27,7 @@ func NewConfig() (*Config, error) {
 		GithubClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
 		RedirectURL:        os.Getenv("REDIRECT_URL"),
 		FrontendURL:        os.Getenv("FRONTEND_URL"),
+		RedisURL:           os.Getenv("REDIS_URL"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -50,6 +52,10 @@ func NewConfig() (*Config, error) {
 
 	if cfg.FrontendURL == "" {
 		return nil, errors.New("FRONTEND_URL is not set")
+	}
+
+	if cfg.RedisURL == "" {
+		return nil, errors.New("REDIS_URL is not set")
 	}
 
 	return cfg, nil

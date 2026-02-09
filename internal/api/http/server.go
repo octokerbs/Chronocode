@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/octokerbs/chronocode-backend/internal/api/http/handler"
 	"github.com/octokerbs/chronocode-backend/internal/application"
+	"github.com/octokerbs/chronocode-backend/internal/domain/cache"
+	"github.com/octokerbs/chronocode-backend/internal/domain/codehost"
 )
 
 type HTTPServer struct {
@@ -17,7 +19,7 @@ type HTTPServer struct {
 	frontendURL string
 }
 
-func NewHTTPServer(analyzer *application.Analyzer, persistCommits *application.PersistCommits, prepareRepo *application.PrepareRepository, querier *application.Querier, auth *application.Auth, port string, frontendURL string) *HTTPServer {
+func NewHTTPServer(analyzer *application.Analyzer, persistCommits *application.PersistCommits, prepareRepo *application.PrepareRepository, querier *application.Querier, auth *application.Auth, userProfile *application.UserProfile, cachePort cache.Cache, codeHostFactory codehost.CodeHostFactory, port string, frontendURL string) *HTTPServer {
 	engine := gin.Default()
 
 	engine.Use(cors.New(cors.Config{
@@ -38,11 +40,12 @@ func NewHTTPServer(analyzer *application.Analyzer, persistCommits *application.P
 		frontendURL: frontendURL,
 	}
 
-	analysisHandler := handler.NewAnalyzerHandler(prepareRepo, analyzer, persistCommits)
+	analysisHandler := handler.NewAnalyzerHandler(prepareRepo, analyzer, persistCommits, cachePort, codeHostFactory)
 	querierHandler := handler.NewQuerierHandler(querier)
+	userHandler := handler.NewUserHandler(userProfile)
 
 	s.registerPublicRoutes(engine, auth)
-	s.registerAuthenticatedRoutes(engine, analysisHandler, querierHandler)
+	s.registerAuthenticatedRoutes(engine, analysisHandler, querierHandler, userHandler)
 
 	return s
 }
@@ -64,14 +67,22 @@ func (s *HTTPServer) registerPublicRoutes(engine *gin.Engine, auth *application.
 	authHandler := handler.NewAuthHandler(auth, s.frontendURL)
 	engine.GET("/auth/github/login", authHandler.Login)
 	engine.GET("/auth/github/callback", authHandler.LoginCallback)
+
+	engine.POST("/auth/logout", func(c *gin.Context) {
+		c.SetCookie("access_token", "", -1, "/", "", false, true)
+		c.JSON(http.StatusOK, gin.H{"message": "logged out"})
+	})
 }
 
-func (s *HTTPServer) registerAuthenticatedRoutes(engine *gin.Engine, analysisHandler *handler.AnalyzerHandler, querierHandler *handler.QuerierHandler) {
+func (s *HTTPServer) registerAuthenticatedRoutes(engine *gin.Engine, analysisHandler *handler.AnalyzerHandler, querierHandler *handler.QuerierHandler, userHandler *handler.UserHandler) {
 	authenticated := engine.Group("/")
 	authenticated.Use(s.authMiddleware())
 	{
 		authenticated.POST("/analyze", analysisHandler.AnalyzeRepository)
 		authenticated.GET("/subcommits-timeline", querierHandler.GetSubcommits)
+		authenticated.GET("/user/profile", userHandler.GetProfile)
+		authenticated.GET("/repositories", userHandler.GetRepositories)
+		authenticated.GET("/user/repos/search", userHandler.SearchRepositories)
 	}
 }
 
