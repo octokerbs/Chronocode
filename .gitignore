@@ -27,3 +27,8 @@ go.work.sum
 .vscode
 
 internal2/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
