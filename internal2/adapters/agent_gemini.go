@@ -9,12 +9,12 @@ import (
 	"github.com/octokerbs/chronocode-backend/internal/domain/analysis"
 )
 
-type AgentGemini struct {
+type GeminiAgent struct {
 	client          *genai.Client
 	generativeModel *genai.GenerativeModel
 }
 
-func NewAgentGemini(client *genai.Client, model string) (*AgentGemini, error) {
+func NewGeminiAgent(client *genai.Client, model string) (*GeminiAgent, error) {
 	if client == nil {
 		return nil, errors.New("missing geminiClient")
 	}
@@ -26,10 +26,10 @@ func NewAgentGemini(client *genai.Client, model string) (*AgentGemini, error) {
 	generativeModel := client.GenerativeModel(model)
 	generativeModel.ResponseMIMEType = "application/json"
 
-	return &AgentGemini{client: client, generativeModel: generativeModel}, nil
+	return &GeminiAgent{client: client, generativeModel: generativeModel}, nil
 }
 
-func (ga *AgentGemini) AnalyzeCommitDiff(ctx context.Context, diff string) (analysis.CommitAnalysis, error) {
+func (ga *GeminiAgent) AnalyzeCommitDiff(ctx context.Context, diff string) (analysis.CommitAnalysis, error) {
 	tries := 3
 	prompt := ga.commitAnalysisPrompt() + diff
 
@@ -55,7 +55,7 @@ func (ga *AgentGemini) AnalyzeCommitDiff(ctx context.Context, diff string) (anal
 	return commitAnalysis, nil
 }
 
-func (ga *AgentGemini) commitAnalysisSchema() *genai.Schema {
+func (ga *GeminiAgent) commitAnalysisSchema() *genai.Schema {
 	return &genai.Schema{
 		Type: genai.TypeObject,
 		Properties: map[string]*genai.Schema{
@@ -66,7 +66,7 @@ func (ga *AgentGemini) commitAnalysisSchema() *genai.Schema {
 	}
 }
 
-func (ga *AgentGemini) commitSchema() *genai.Schema {
+func (ga *GeminiAgent) commitSchema() *genai.Schema {
 	return &genai.Schema{
 		Type: genai.TypeObject,
 		Properties: map[string]*genai.Schema{
@@ -80,7 +80,7 @@ func (ga *AgentGemini) commitSchema() *genai.Schema {
 	}
 }
 
-func (ga *AgentGemini) subcommitsSchema() *genai.Schema {
+func (ga *GeminiAgent) subcommitsSchema() *genai.Schema {
 	return &genai.Schema{
 		Type:        genai.TypeArray,
 		Items:       ga.subcommitSchema(),
@@ -88,7 +88,7 @@ func (ga *AgentGemini) subcommitsSchema() *genai.Schema {
 	}
 }
 
-func (ga *AgentGemini) subcommitSchema() *genai.Schema {
+func (ga *GeminiAgent) subcommitSchema() *genai.Schema {
 	return &genai.Schema{
 		Type: genai.TypeObject,
 		Properties: map[string]*genai.Schema{
@@ -125,7 +125,7 @@ func (ga *AgentGemini) subcommitSchema() *genai.Schema {
 	}
 }
 
-func (ga *AgentGemini) commitAnalysisPrompt() string {
+func (ga *GeminiAgent) commitAnalysisPrompt() string {
 	return `
 	You are a Commit Expert Analyzer specializing in code analysis and software development patterns.
 	You will receive a Git Commit diff.
@@ -136,7 +136,7 @@ func (ga *AgentGemini) commitAnalysisPrompt() string {
 	`
 }
 
-func (ga *AgentGemini) generateStructuredContent(ctx context.Context, prompt string, schema *genai.Schema) ([]byte, error) {
+func (ga *GeminiAgent) generateStructuredContent(ctx context.Context, prompt string, schema *genai.Schema) ([]byte, error) {
 	ga.generativeModel.ResponseSchema = schema
 
 	resp, err := ga.generativeModel.GenerateContent(ctx, genai.Text(prompt))
