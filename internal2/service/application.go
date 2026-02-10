@@ -40,6 +40,8 @@ func NewApplication(ctx context.Context) app.Application {
 		panic(err)
 	}
 
+	// Codehost setup
+
 	fmt.Println(agent)
 	fmt.Println(repositoryRepository)
 
