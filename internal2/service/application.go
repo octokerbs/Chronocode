@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 
@@ -19,12 +20,28 @@ func NewApplication(ctx context.Context) app.Application {
 		panic(err)
 	}
 
-	agent, err := adapters.NewAgentGemini(geminiClient, os.Getenv("GEMINI_GENERATIVE_MODEL"))
+	agent, err := adapters.NewGeminiAgent(geminiClient, os.Getenv("GEMINI_GENERATIVE_MODEL"))
+	if err != nil {
+		panic(err)
+	}
+
+	// Repositories setup
+	postgresClient, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+	if err != nil {
+		panic(err)
+	}
+
+	if err := postgresClient.Ping(); err != nil {
+		panic(err)
+	}
+
+	repositoryRepository, err := adapters.NewPostgresRepositoryRepository(postgresClient)
 	if err != nil {
 		panic(err)
 	}
 
 	fmt.Println(agent)
+	fmt.Println(repositoryRepository)
 
 	return app.Application{
 		Commands: app.Commands{},
