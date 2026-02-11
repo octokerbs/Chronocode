@@ -1,4 +1,4 @@
-package githubauth
+package auth
 
 import (
 	"context"

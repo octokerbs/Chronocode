@@ -7,14 +7,13 @@ import (
 	"os"
 
 	"github.com/google/generative-ai-go/genai"
-	"github.com/octokerbs/chronocode-backend/internal2/adapters"
-	"github.com/octokerbs/chronocode-backend/internal2/app"
+	_ "github.com/lib/pq"
+	"github.com/octokerbs/chronocode-backend/internal/adapters"
+	"github.com/octokerbs/chronocode-backend/internal/app"
 	"google.golang.org/api/option"
 )
 
 func NewApplication(ctx context.Context) app.Application {
-
-	// Agent setup
 	geminiClient, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
 	if err != nil {
 		panic(err)
@@ -25,7 +24,6 @@ func NewApplication(ctx context.Context) app.Application {
 		panic(err)
 	}
 
-	// Repositories setup
 	postgresClient, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
 	if err != nil {
 		panic(err)
@@ -40,10 +38,11 @@ func NewApplication(ctx context.Context) app.Application {
 		panic(err)
 	}
 
-	// Codehost setup
+	codeHostFactory := adapters.NewGithubCodeHostFactory()
 
 	fmt.Println(agent)
 	fmt.Println(repositoryRepository)
+	fmt.Println(codeHostFactory)
 
 	return app.Application{
 		Commands: app.Commands{},
