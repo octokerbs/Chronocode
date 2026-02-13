@@ -5,16 +5,16 @@ import (
 	"errors"
 )
 
-type PostgresRepositoryRepository struct {
+type PostgresRepoRepository struct {
 	db *sql.DB
 }
 
-func NewPostgresRepositoryRepository(postgresClient *sql.DB) (*PostgresRepositoryRepository, error) {
+func NewPostgresRepositoryRepository(postgresClient *sql.DB) (*PostgresRepoRepository, error) {
 	if postgresClient == nil {
 		return nil, errors.New("missing postgresClient")
 	}
 
-	return &PostgresRepositoryRepository{db: postgresClient}, nil
+	return &PostgresRepoRepository{db: postgresClient}, nil
 }
 
 // func (pg *PostgresRepositoryRepository) GetRepository(ctx context.Context, id int64) (*analysis.Repository, error) {

@@ -8,8 +8,9 @@ import (
 
 	"github.com/google/generative-ai-go/genai"
 	_ "github.com/lib/pq"
-	"github.com/octokerbs/chronocode-backend/internal/adapters"
-	"github.com/octokerbs/chronocode-backend/internal/app"
+	"github.com/octokerbs/chronocode/internal/adapters"
+	"github.com/octokerbs/chronocode/internal/app"
+
 	"google.golang.org/api/option"
 )
 

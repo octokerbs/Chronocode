@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/octokerbs/chronocode-backend/internal/service"
+	"github.com/octokerbs/chronocode/internal/service"
 )
 
 func main() {

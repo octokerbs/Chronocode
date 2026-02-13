@@ -17,18 +17,6 @@ services:
       timeout: 5s
       retries: 5
 
-  migrator:
-    image: migrate/migrate:v4.16.2
-    container_name: chronocode_db_migrator
-    volumes:
-      - ./migrations:/migrations
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    command: [ "-database", "${DATABASE_URL}", "-path", "/migrations", "up" ]
-
   app:
     build: .
     container_name: go_analyzer_app
@@ -39,8 +27,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_GENERATIVE_MODEL: ${GEMINI_GENERATIVE_MODEL}
     depends_on:
-      migrator:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:
