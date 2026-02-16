@@ -85,3 +85,57 @@ func (s *AnalyzeRepositoryTestSuite) TestExistingRepoSubcommitsAreAddedToExistin
 
 	assert.Greater(s.T(), len(subcommitsAfter), len(subcommitsBefore))
 }
+
+func (s *AnalyzeRepositoryTestSuite) TestInvalidURLDoesNotStoreRepo() {
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.InvalidRepoURL})
+	_, err := s.repoRepository.GetRepo(context.Background(), adapters.InvalidRepoURL)
+
+	assert.True(s.T(), errors.Is(err, repo.ErrRepositoryNotFound))
+}
+
+func (s *AnalyzeRepositoryTestSuite) TestInvalidURLDoesNotStoreSubcommits() {
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.InvalidRepoURL})
+	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
+
+	assert.Nil(s.T(), err)
+	assert.Empty(s.T(), subcommits)
+}
+
+func (s *AnalyzeRepositoryTestSuite) TestAnalyzingTwoReposDoesNotMixSubcommits() {
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL})
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidEmptyRepoURL})
+	subcommits, _ := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidEmptyRepoID)
+
+	assert.Empty(s.T(), subcommits)
+}
+
+func (s *AnalyzeRepositoryTestSuite) TestSubcommitsBelongToAnalyzedRepo() {
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL})
+	subcommits, _ := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
+
+	for _, sc := range subcommits {
+		assert.Equal(s.T(), adapters.ValidRepoID, sc.RepoID())
+	}
+}
+
+func (s *AnalyzeRepositoryTestSuite) TestExistingRepoIsNotDuplicatedAfterReAnalysis() {
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL})
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL})
+	_, err := s.repoRepository.GetRepo(context.Background(), adapters.ValidRepoURL)
+
+	assert.Nil(s.T(), err)
+}
+
+func (s *AnalyzeRepositoryTestSuite) TestEmptyRepoIsStillStored() {
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidEmptyRepoURL})
+	_, err := s.repoRepository.GetRepo(context.Background(), adapters.ValidEmptyRepoURL)
+
+	assert.Nil(s.T(), err)
+}
+
+func (s *AnalyzeRepositoryTestSuite) TestEachCommitProducesAtLeastOneSubcommit() {
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL})
+	subcommits, _ := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
+
+	assert.GreaterOrEqual(s.T(), len(subcommits), 1)
+}
