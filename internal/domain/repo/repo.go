@@ -20,3 +20,7 @@ func (r *Repo) IsURL(url string) bool {
 func (r *Repo) URL() string {
 	return r.url
 }
+
+func (r *Repo) ID() int64 {
+	return r.id
+}
