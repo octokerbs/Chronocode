@@ -13,4 +13,5 @@ var (
 
 type CodeHost interface {
 	CreateRepoFromURL(ctx context.Context, url string) (*repo.Repo, error)
+	GetRepoCommitSHAsIntoChannel(ctx context.Context, repo *repo.Repo, commitSHAs chan<- string)
 }

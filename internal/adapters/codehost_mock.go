@@ -1,4 +1,4 @@
-package mocks
+package adapters
 
 import (
 	"context"
@@ -8,8 +8,12 @@ import (
 )
 
 var (
-	ValidRepoURL   = "https/validRepo"
-	InvalidRepoURL = "https/invalidRepo"
+	ValidRepoURL             = "https/validRepo"
+	ValidRepoID        int64 = 123456789
+	ValidRepoCommitSHA       = "CommitSHA-1"
+	ValidEmptyRepoURL        = "https/emptyRepo"
+	ValidEmptyRepoID   int64 = 9876543221
+	InvalidRepoURL           = "https/invalidRepo"
 )
 
 type CodeHost struct {
@@ -25,6 +29,13 @@ func (c *CodeHost) CreateRepoFromURL(ctx context.Context, url string) (*repo.Rep
 	}
 
 	newRepo := repo.NewRepo(1, "chronocode", ValidRepoURL, "FFFFFF")
-
 	return newRepo, nil
+}
+
+func (c *CodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, repo *repo.Repo, commitSHAs chan<- string) {
+	if repo.URL() == ValidEmptyRepoURL {
+		return
+	}
+
+	commitSHAs <- ValidRepoCommitSHA
 }

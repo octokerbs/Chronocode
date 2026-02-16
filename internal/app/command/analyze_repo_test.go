@@ -5,18 +5,22 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/octokerbs/chronocode/internal/adapters"
+	"github.com/octokerbs/chronocode/internal/domain/agent"
 	"github.com/octokerbs/chronocode/internal/domain/codehost"
 	"github.com/octokerbs/chronocode/internal/domain/repo"
-	"github.com/octokerbs/chronocode/testing/mocks"
+	"github.com/octokerbs/chronocode/internal/domain/subcommit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
 type AnalyzeRepositoryTestSuite struct {
 	suite.Suite
-	repoRepository repo.Repository
-	codeHost       codehost.CodeHost
-	handler        AnalyzeRepoHandler
+	repoRepository      repo.Repository
+	subcommitRepository subcommit.Repository
+	agent               agent.Agent
+	codeHost            codehost.CodeHost
+	handler             AnalyzeRepoHandler
 }
 
 func TestAnalyzeRepositoryTestSuite(t *testing.T) {
@@ -24,35 +28,49 @@ func TestAnalyzeRepositoryTestSuite(t *testing.T) {
 }
 
 func (s *AnalyzeRepositoryTestSuite) SetupTest() {
-	s.repoRepository = mocks.NewRepoRepository()
-	s.codeHost = mocks.NewCodeHost()
-	s.handler = NewAnalyzeRepoHandler(s.repoRepository, s.codeHost)
+	s.repoRepository = adapters.NewRepoRepository()
+	s.subcommitRepository = adapters.NewSubcommitRepository()
+	s.agent = adapters.NewAgent()
+	s.codeHost = adapters.NewCodeHost()
+	s.handler = NewAnalyzeRepoHandler(s.repoRepository, s.subcommitRepository, s.agent, s.codeHost)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestCannotAnalyzeWithInvalidURL() {
-	err := s.handler.Handle(context.Background(), AnalyzeRepo{mocks.InvalidRepoURL})
+	err := s.handler.Handle(context.Background(), AnalyzeRepo{adapters.InvalidRepoURL})
 	assert.True(s.T(), errors.Is(err, codehost.ErrInvalidRepoURL))
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestAnalyzesValidRepoSuccessfully() {
-	err := s.handler.Handle(context.Background(), AnalyzeRepo{mocks.ValidRepoURL})
+	err := s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL})
 	assert.Nil(s.T(), err)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestStoresNewRepositoryAfterAnalysis() {
-	_ = s.handler.Handle(context.Background(), AnalyzeRepo{mocks.ValidRepoURL})
-	_, err := s.repoRepository.GetRepo(context.Background(), mocks.ValidRepoURL)
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL})
+	_, err := s.repoRepository.GetRepo(context.Background(), adapters.ValidRepoURL)
 	assert.Nil(s.T(), err)
 }
 
-//func (s *AnalyzeRepositoryTestSuite) Test04ExistingRepositoryMayHaveOutdatedCommits() {
-//
-//}
-//
-//func (s *AnalyzeRepositoryTestSuite) Test05NewRepoHasSubcommitsAfterAnalysis() {
-//
-//}
-//
-//func (s *AnalyzeRepositoryTestSuite) Test06ExistingRepoSubcommitsAreAddedToExistingOnes() {
-//
-//}
+func (s *AnalyzeRepositoryTestSuite) TestNewRepoHasSubcommitsAfterAnalysis() {
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL})
+	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
+
+	assert.Nil(s.T(), err)
+	assert.NotEmpty(s.T(), subcommits)
+}
+
+func (s *AnalyzeRepositoryTestSuite) TestNewRepoWithoutCommitsHasNoSubcommits() {
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidEmptyRepoURL})
+	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidEmptyRepoID)
+
+	assert.Nil(s.T(), err)
+	assert.Empty(s.T(), subcommits)
+}
+
+func (s *AnalyzeRepositoryTestSuite) TestExistingRepositoryMayHaveOutdatedSubcommits() {
+
+}
+
+func (s *AnalyzeRepositoryTestSuite) TestExistingRepoSubcommitsAreAddedToExistingOnes() {
+
+}
