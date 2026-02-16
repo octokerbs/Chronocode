@@ -28,8 +28,11 @@ func (c *CodeHost) CreateRepoFromURL(ctx context.Context, url string) (*repo.Rep
 		return nil, codehost.ErrInvalidRepoURL
 	}
 
-	newRepo := repo.NewRepo(1, "chronocode", ValidRepoURL, "FFFFFF")
-	return newRepo, nil
+	if url == ValidEmptyRepoURL {
+		return repo.NewRepo(ValidEmptyRepoID, "empty-repo", ValidEmptyRepoURL, ""), nil
+	}
+
+	return repo.NewRepo(ValidRepoID, "chronocode", ValidRepoURL, "FFFFFF"), nil
 }
 
 func (c *CodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, repo *repo.Repo, commitSHAs chan<- string) {

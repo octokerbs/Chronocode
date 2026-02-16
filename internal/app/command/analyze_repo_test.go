@@ -68,9 +68,20 @@ func (s *AnalyzeRepositoryTestSuite) TestNewRepoWithoutCommitsHasNoSubcommits() 
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestExistingRepositoryMayHaveOutdatedSubcommits() {
+	_ = s.repoRepository.StoreRepo(context.Background(), repo.NewRepo(adapters.ValidRepoID, "chronocode", adapters.ValidRepoURL, "old-sha"))
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL})
+	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
 
+	assert.Nil(s.T(), err)
+	assert.NotEmpty(s.T(), subcommits)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestExistingRepoSubcommitsAreAddedToExistingOnes() {
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL})
+	subcommitsBefore, _ := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
 
+	_ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL})
+	subcommitsAfter, _ := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
+
+	assert.Greater(s.T(), len(subcommitsAfter), len(subcommitsBefore))
 }

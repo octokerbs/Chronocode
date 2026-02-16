@@ -42,22 +42,23 @@ func (s *AnalyzeRepoHandler) Handle(ctx context.Context, cmd AnalyzeRepo) error 
 	commitSHAs := make(chan string, 100)
 	subcommits := make(chan subcommit.Subcommit, 100)
 
+	wg.Add(3)
+
 	go func() {
-		wg.Add(1)
+		defer wg.Done()
 		s.codeHost.GetRepoCommitSHAsIntoChannel(ctx, newRepo, commitSHAs)
-		wg.Done()
+		close(commitSHAs)
 	}()
 
 	go func() {
-		wg.Add(1)
+		defer wg.Done()
 		s.agent.AnalyzeCommitsIntoSubcommits(ctx, commitSHAs, subcommits)
-		wg.Done()
+		close(subcommits)
 	}()
 
 	go func() {
-		wg.Add(1)
+		defer wg.Done()
 		s.subcommitRepository.StoreSubcommits(ctx, subcommits)
-		wg.Done()
 	}()
 
 	wg.Wait()

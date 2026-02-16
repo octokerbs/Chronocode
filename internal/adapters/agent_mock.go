@@ -14,8 +14,8 @@ func NewAgent() *Agent {
 }
 
 func (a *Agent) AnalyzeCommitsIntoSubcommits(ctx context.Context, commitSHAs <-chan string, subcommits chan<- subcommit.Subcommit) {
-	for range commitSHAs {
-		subcommits <- subcommit.Subcommit{}
+	for sha := range commitSHAs {
+		subcommits <- subcommit.NewSubcommit("title", "description", "feat", sha, []string{}, ValidRepoID)
 	}
 
 }

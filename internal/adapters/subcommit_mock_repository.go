@@ -7,7 +7,7 @@ import (
 )
 
 type SubcommitRepository struct {
-	subcommits map[int64]subcommit.Subcommit
+	subcommits []subcommit.Subcommit
 }
 
 func NewSubcommitRepository() *SubcommitRepository {
@@ -16,9 +16,9 @@ func NewSubcommitRepository() *SubcommitRepository {
 
 func (s *SubcommitRepository) GetSubcommits(ctx context.Context, repoID int64) ([]subcommit.Subcommit, error) {
 	repoSubcommits := []subcommit.Subcommit{}
-	for k, v := range s.subcommits {
-		if k == repoID {
-			repoSubcommits = append(repoSubcommits, v)
+	for _, sc := range s.subcommits {
+		if sc.RepoID() == repoID {
+			repoSubcommits = append(repoSubcommits, sc)
 		}
 	}
 
@@ -27,9 +27,8 @@ func (s *SubcommitRepository) GetSubcommits(ctx context.Context, repoID int64) (
 
 func (s *SubcommitRepository) StoreSubcommits(ctx context.Context, subcommits <-chan subcommit.Subcommit) {
 	for sc := range subcommits {
-		s.subcommits[sc.RepoID()] = sc
+		s.subcommits = append(s.subcommits, sc)
 	}
-
 }
 
 func (s *SubcommitRepository) StoreSubcommit(ctx context.Context, subcommit subcommit.Subcommit) {
