@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+	"errors"
 
 	"github.com/octokerbs/chronocode/internal/domain/codehost"
 	"github.com/octokerbs/chronocode/internal/domain/repo"
@@ -14,13 +15,41 @@ var (
 	ValidEmptyRepoURL        = "https/emptyRepo"
 	ValidEmptyRepoID   int64 = 9876543221
 	InvalidRepoURL           = "https/invalidRepo"
+	ForbiddenRepoURL         = "https/forbiddenRepo"
+	FailingAgentRepoURL        = "https/failingAgentRepo"
+	FailingAgentRepoID   int64 = 111111111
+	ValidAccessToken           = "valid-token"
+	InvalidAccessToken         = "invalid-token"
+	ValidCommitDiff            = "diff --git a/main.go b/main.go\n+func main() {}"
+	FailingDiff                = "failing-diff"
 )
 
-type CodeHost struct {
+type CodeHostFactory struct{}
+
+func NewCodeHostFactory() *CodeHostFactory {
+	return &CodeHostFactory{}
 }
+
+func (f *CodeHostFactory) Create(ctx context.Context, accessToken string) (codehost.CodeHost, error) {
+	if accessToken == "" || accessToken == InvalidAccessToken {
+		return nil, errors.New("invalid access token")
+	}
+
+	return NewCodeHost(), nil
+}
+
+type CodeHost struct{}
 
 func NewCodeHost() *CodeHost {
 	return &CodeHost{}
+}
+
+func (c *CodeHost) CanAccessRepo(ctx context.Context, repoURL string) error {
+	if repoURL == ForbiddenRepoURL {
+		return codehost.ErrAccessDenied
+	}
+
+	return nil
 }
 
 func (c *CodeHost) CreateRepoFromURL(ctx context.Context, url string) (*repo.Repo, error) {
@@ -32,13 +61,26 @@ func (c *CodeHost) CreateRepoFromURL(ctx context.Context, url string) (*repo.Rep
 		return repo.NewRepo(ValidEmptyRepoID, "empty-repo", ValidEmptyRepoURL, ""), nil
 	}
 
+	if url == FailingAgentRepoURL {
+		return repo.NewRepo(FailingAgentRepoID, "failing-agent", FailingAgentRepoURL, ""), nil
+	}
+
 	return repo.NewRepo(ValidRepoID, "chronocode", ValidRepoURL, "FFFFFF"), nil
 }
 
-func (c *CodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, repo *repo.Repo, commitSHAs chan<- string) {
+func (c *CodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, repo *repo.Repo, commitSHAs chan<- string) error {
 	if repo.URL() == ValidEmptyRepoURL {
-		return
+		return nil
 	}
 
 	commitSHAs <- ValidRepoCommitSHA
+	return nil
+}
+
+func (c *CodeHost) GetCommitDiff(ctx context.Context, r *repo.Repo, commitSHA string) (string, error) {
+	if r.URL() == FailingAgentRepoURL {
+		return FailingDiff, nil
+	}
+
+	return ValidCommitDiff, nil
 }

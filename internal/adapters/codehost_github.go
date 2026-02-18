@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	"github.com/google/go-github/github"
+	"github.com/octokerbs/chronocode/internal/domain/codehost"
+	"github.com/octokerbs/chronocode/internal/domain/repo"
 
 	"golang.org/x/oauth2"
 )
@@ -16,7 +18,7 @@ func NewGithubCodeHostFactory() *GithubCodeHostFactory {
 	return &GithubCodeHostFactory{}
 }
 
-func (f *GithubCodeHostFactory) Create(ctx context.Context, accessToken string) (*GithubCodeHost, error) {
+func (f *GithubCodeHostFactory) Create(ctx context.Context, accessToken string) (codehost.CodeHost, error) {
 	codeHost, err := NewGithubCodeHost(ctx, accessToken)
 	if err != nil {
 		return nil, err
@@ -48,6 +50,22 @@ func NewGithubCodeHost(ctx context.Context, accessToken string) (*GithubCodeHost
 	}
 
 	return &GithubCodeHost{client, options}, nil
+}
+
+func (gc *GithubCodeHost) CanAccessRepo(ctx context.Context, repoURL string) error {
+	return nil
+}
+
+func (gc *GithubCodeHost) CreateRepoFromURL(ctx context.Context, url string) (*repo.Repo, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (gc *GithubCodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, r *repo.Repo, commitSHAs chan<- string) error {
+	return errors.New("not implemented")
+}
+
+func (gc *GithubCodeHost) GetCommitDiff(ctx context.Context, r *repo.Repo, commitSHA string) (string, error) {
+	return "", errors.New("not implemented")
 }
 
 // func (gc *GithubCodeHost) FetchRepository(ctx context.Context, repoURL string) (*analysis.Repository, error) {

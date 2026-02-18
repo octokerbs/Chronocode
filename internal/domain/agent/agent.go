@@ -2,10 +2,20 @@ package agent
 
 import (
 	"context"
-
-	"github.com/octokerbs/chronocode/internal/domain/subcommit"
+	"errors"
 )
 
+var (
+	ErrAnalysisFailed = errors.New("agent analysis failed")
+)
+
+type AnalysisResult struct {
+	Title            string
+	Description      string
+	ModificationType string
+	Files            []string
+}
+
 type Agent interface {
-	AnalyzeCommitsIntoSubcommits(ctx context.Context, commitSHAs <-chan string, subcommits chan<- subcommit.Subcommit)
+	AnalyzeDiff(ctx context.Context, diff string) ([]AnalysisResult, error)
 }

@@ -3,19 +3,21 @@ package adapters
 import (
 	"context"
 
-	"github.com/octokerbs/chronocode/internal/domain/subcommit"
+	"github.com/octokerbs/chronocode/internal/domain/agent"
 )
 
-type Agent struct {
-}
+type Agent struct{}
 
 func NewAgent() *Agent {
 	return &Agent{}
 }
 
-func (a *Agent) AnalyzeCommitsIntoSubcommits(ctx context.Context, commitSHAs <-chan string, subcommits chan<- subcommit.Subcommit) {
-	for sha := range commitSHAs {
-		subcommits <- subcommit.NewSubcommit("title", "description", "feat", sha, []string{}, ValidRepoID)
+func (a *Agent) AnalyzeDiff(ctx context.Context, diff string) ([]agent.AnalysisResult, error) {
+	if diff == FailingDiff {
+		return nil, agent.ErrAnalysisFailed
 	}
 
+	return []agent.AnalysisResult{
+		{Title: "title", Description: "description", ModificationType: "feat", Files: []string{}},
+	}, nil
 }

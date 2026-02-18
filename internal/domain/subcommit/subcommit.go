@@ -1,25 +1,25 @@
 package subcommit
 
 type Subcommit struct {
-	title             string
-	description       string
-	modification_type string
-	commit_sha        string
-	files             []string
-	repo_id           int64 // FK
+	title            string
+	description      string
+	modificationType string
+	commitSHA        string
+	files            []string
+	repoID           int64
 }
 
 func NewSubcommit(title, description, modificationType, commitSHA string, files []string, repoID int64) Subcommit {
 	return Subcommit{
-		title:             title,
-		description:       description,
-		modification_type: modificationType,
-		commit_sha:        commitSHA,
-		files:             files,
-		repo_id:           repoID,
+		title:            title,
+		description:      description,
+		modificationType: modificationType,
+		commitSHA:        commitSHA,
+		files:            files,
+		repoID:           repoID,
 	}
 }
 
 func (s *Subcommit) RepoID() int64 {
-	return s.repo_id
+	return s.repoID
 }
