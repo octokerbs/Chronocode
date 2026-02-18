@@ -60,8 +60,8 @@ func (gc *GithubCodeHost) CreateRepoFromURL(ctx context.Context, url string) (*r
 	return nil, errors.New("not implemented")
 }
 
-func (gc *GithubCodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, r *repo.Repo, commitSHAs chan<- string) error {
-	return errors.New("not implemented")
+func (gc *GithubCodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, r *repo.Repo, commits chan<- codehost.CommitReference) (string, error) {
+	return "", errors.New("not implemented")
 }
 
 func (gc *GithubCodeHost) GetCommitDiff(ctx context.Context, r *repo.Repo, commitSHA string) (string, error) {

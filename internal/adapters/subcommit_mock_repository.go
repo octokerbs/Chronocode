@@ -25,6 +25,15 @@ func (s *SubcommitRepository) GetSubcommits(ctx context.Context, repoID int64) (
 	return repoSubcommits, nil
 }
 
+func (s *SubcommitRepository) HasSubcommitsForCommit(ctx context.Context, repoID int64, commitSHA string) (bool, error) {
+	for _, sc := range s.subcommits {
+		if sc.RepoID() == repoID && sc.CommitSHA() == commitSHA {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (s *SubcommitRepository) StoreSubcommits(ctx context.Context, subcommits <-chan subcommit.Subcommit) error {
 	for sc := range subcommits {
 		s.subcommits = append(s.subcommits, sc)

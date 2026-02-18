@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/octokerbs/chronocode/internal/domain/agent"
+	"github.com/octokerbs/chronocode/internal/domain/analysis"
 	"github.com/octokerbs/chronocode/internal/domain/codehost"
 	"github.com/octokerbs/chronocode/internal/domain/repo"
 	"github.com/octokerbs/chronocode/internal/domain/subcommit"
@@ -24,10 +25,11 @@ type AnalyzeRepoHandler struct {
 	subcommitRepository subcommit.Repository
 	agent               agent.Agent
 	codeHostFactory     codehost.CodeHostFactory
+	locker              analysis.Locker
 }
 
-func NewAnalyzeRepoHandler(repoRepository repo.Repository, subcommitRepository subcommit.Repository, agent agent.Agent, codeHostFactory codehost.CodeHostFactory) AnalyzeRepoHandler {
-	return AnalyzeRepoHandler{repoRepository: repoRepository, subcommitRepository: subcommitRepository, agent: agent, codeHostFactory: codeHostFactory}
+func NewAnalyzeRepoHandler(repoRepository repo.Repository, subcommitRepository subcommit.Repository, agent agent.Agent, codeHostFactory codehost.CodeHostFactory, locker analysis.Locker) AnalyzeRepoHandler {
+	return AnalyzeRepoHandler{repoRepository: repoRepository, subcommitRepository: subcommitRepository, agent: agent, codeHostFactory: codeHostFactory, locker: locker}
 }
 
 func (s *AnalyzeRepoHandler) Handle(ctx context.Context, cmd AnalyzeRepo) error {
@@ -39,6 +41,12 @@ func (s *AnalyzeRepoHandler) Handle(ctx context.Context, cmd AnalyzeRepo) error 
 	if err := codeHost.CanAccessRepo(ctx, cmd.RepoURL); err != nil {
 		return err
 	}
+
+	release, err := s.locker.Acquire(ctx, cmd.RepoURL)
+	if err != nil {
+		return err
+	}
+	defer release()
 
 	newRepo, err := s.repoRepository.GetRepo(ctx, cmd.RepoURL)
 	if err != nil {
@@ -56,16 +64,17 @@ func (s *AnalyzeRepoHandler) Handle(ctx context.Context, cmd AnalyzeRepo) error 
 	defer cancel()
 
 	var wg sync.WaitGroup
-	commitSHAs := make(chan string, 100)
+	commitRefs := make(chan codehost.CommitReference, 100)
 	subcommits := make(chan subcommit.Subcommit, 100)
 
 	var fetchErr, analysisErr, storageErr error
+	var headSHA string
 	wg.Add(3)
 
 	go func() {
 		defer wg.Done()
-		defer close(commitSHAs)
-		fetchErr = codeHost.GetRepoCommitSHAsIntoChannel(ctx, newRepo, commitSHAs)
+		defer close(commitRefs)
+		headSHA, fetchErr = codeHost.GetRepoCommitSHAsIntoChannel(ctx, newRepo, commitRefs)
 		if fetchErr != nil {
 			cancel()
 		}
@@ -74,7 +83,7 @@ func (s *AnalyzeRepoHandler) Handle(ctx context.Context, cmd AnalyzeRepo) error 
 	go func() {
 		defer wg.Done()
 		defer close(subcommits)
-		analysisErr = s.analyzeCommits(ctx, codeHost, newRepo, commitSHAs, subcommits)
+		analysisErr = s.analyzeCommits(ctx, codeHost, newRepo, commitRefs, subcommits)
 	}()
 
 	go func() {
@@ -87,23 +96,25 @@ func (s *AnalyzeRepoHandler) Handle(ctx context.Context, cmd AnalyzeRepo) error 
 	if fetchErr != nil {
 		return fetchErr
 	}
-	if analysisErr != nil {
-		return analysisErr
-	}
-	if storageErr != nil {
-		return storageErr
+
+	if analysisErr == nil && storageErr == nil && headSHA != "" {
+		newRepo.SetLastAnalyzedCommitSHA(headSHA)
 	}
 
-	return s.repoRepository.StoreRepo(ctx, newRepo)
+	if err := s.repoRepository.StoreRepo(ctx, newRepo); err != nil {
+		return err
+	}
+
+	return errors.Join(analysisErr, storageErr)
 }
 
-func (s *AnalyzeRepoHandler) analyzeCommits(ctx context.Context, codeHost codehost.CodeHost, r *repo.Repo, commitSHAs <-chan string, subcommits chan<- subcommit.Subcommit) error {
+func (s *AnalyzeRepoHandler) analyzeCommits(ctx context.Context, codeHost codehost.CodeHost, r *repo.Repo, commitRefs <-chan codehost.CommitReference, subcommits chan<- subcommit.Subcommit) error {
 	var wg sync.WaitGroup
-	var firstErr error
-	var errOnce sync.Once
+	var mu sync.Mutex
+	var errs []error
 	sem := make(chan struct{}, maxConcurrentAnalyses)
 
-	for sha := range commitSHAs {
+	for ref := range commitRefs {
 		if ctx.Err() != nil {
 			break
 		}
@@ -111,7 +122,7 @@ func (s *AnalyzeRepoHandler) analyzeCommits(ctx context.Context, codeHost codeho
 		sem <- struct{}{}
 
 		wg.Add(1)
-		go func(sha string) {
+		go func(ref codehost.CommitReference) {
 			defer func() { <-sem }()
 			defer wg.Done()
 
@@ -119,24 +130,39 @@ func (s *AnalyzeRepoHandler) analyzeCommits(ctx context.Context, codeHost codeho
 				return
 			}
 
-			diff, err := codeHost.GetCommitDiff(ctx, r, sha)
+			alreadyAnalyzed, err := s.subcommitRepository.HasSubcommitsForCommit(ctx, r.ID(), ref.SHA)
 			if err != nil {
-				errOnce.Do(func() { firstErr = fmt.Errorf("%w: %v", codehost.ErrDiffFetchFailed, err) })
+				mu.Lock()
+				errs = append(errs, err)
+				mu.Unlock()
+				return
+			}
+			if alreadyAnalyzed {
+				return
+			}
+
+			diff, err := codeHost.GetCommitDiff(ctx, r, ref.SHA)
+			if err != nil {
+				mu.Lock()
+				errs = append(errs, fmt.Errorf("%w: %v", codehost.ErrDiffFetchFailed, err))
+				mu.Unlock()
 				return
 			}
 
 			results, err := s.agent.AnalyzeDiff(ctx, diff)
 			if err != nil {
-				errOnce.Do(func() { firstErr = fmt.Errorf("%w: %v", agent.ErrAnalysisFailed, err) })
+				mu.Lock()
+				errs = append(errs, fmt.Errorf("%w: %v", agent.ErrAnalysisFailed, err))
+				mu.Unlock()
 				return
 			}
 
 			for _, result := range results {
-				subcommits <- subcommit.NewSubcommit(result.Title, result.Description, result.ModificationType, sha, result.Files, r.ID())
+				subcommits <- subcommit.NewSubcommit(result.Title, result.Description, result.ModificationType, ref.SHA, result.Files, r.ID(), ref.CommittedAt)
 			}
-		}(sha)
+		}(ref)
 	}
 
 	wg.Wait()
-	return firstErr
+	return errors.Join(errs...)
 }

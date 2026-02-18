@@ -24,3 +24,11 @@ func (r *Repo) URL() string {
 func (r *Repo) ID() int64 {
 	return r.id
 }
+
+func (r *Repo) LastAnalyzedCommitSHA() string {
+	return r.lastAnalyzedCommitSHA
+}
+
+func (r *Repo) SetLastAnalyzedCommitSHA(sha string) {
+	r.lastAnalyzedCommitSHA = sha
+}
