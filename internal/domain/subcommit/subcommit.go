@@ -24,6 +24,22 @@ func NewSubcommit(title, description, modificationType, commitSHA string, files 
 	}
 }
 
+func (s *Subcommit) Title() string {
+	return s.title
+}
+
+func (s *Subcommit) Description() string {
+	return s.description
+}
+
+func (s *Subcommit) ModificationType() string {
+	return s.modificationType
+}
+
+func (s *Subcommit) Files() []string {
+	return s.files
+}
+
 func (s *Subcommit) RepoID() int64 {
 	return s.repoID
 }

@@ -17,6 +17,10 @@ func (r *Repo) IsURL(url string) bool {
 	return r.url == url
 }
 
+func (r *Repo) Name() string {
+	return r.name
+}
+
 func (r *Repo) URL() string {
 	return r.url
 }

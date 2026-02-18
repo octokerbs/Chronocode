@@ -3,13 +3,14 @@ package service
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"os"
 
 	"github.com/google/generative-ai-go/genai"
 	_ "github.com/lib/pq"
 	"github.com/octokerbs/chronocode/internal/adapters"
 	"github.com/octokerbs/chronocode/internal/app"
+	"github.com/octokerbs/chronocode/internal/app/command"
+	"github.com/octokerbs/chronocode/internal/app/query"
 
 	"google.golang.org/api/option"
 )
@@ -34,19 +35,25 @@ func NewApplication(ctx context.Context) app.Application {
 		panic(err)
 	}
 
-	repositoryRepository, err := adapters.NewPostgresRepositoryRepository(postgresClient)
+	repoRepository, err := adapters.NewPostgresRepoRepository(postgresClient)
+	if err != nil {
+		panic(err)
+	}
+
+	subcommitRepository, err := adapters.NewPostgresSubcommitRepository(postgresClient)
 	if err != nil {
 		panic(err)
 	}
 
 	codeHostFactory := adapters.NewGithubCodeHostFactory()
-
-	fmt.Println(agent)
-	fmt.Println(repositoryRepository)
-	fmt.Println(codeHostFactory)
+	locker := adapters.NewInMemoryLocker()
 
 	return app.Application{
-		Commands: app.Commands{},
-		Queries:  app.Queries{},
+		Commands: app.Commands{
+			AnalyzeRepo: command.NewAnalyzeRepoHandler(repoRepository, subcommitRepository, agent, codeHostFactory, locker),
+		},
+		Queries: app.Queries{
+			GetSubcommits: query.NewGetSubcommitsHandler(repoRepository, subcommitRepository, codeHostFactory),
+		},
 	}
 }

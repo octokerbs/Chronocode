@@ -1,6 +1,9 @@
 package app
 
-import "github.com/octokerbs/chronocode/internal/app/command"
+import (
+	"github.com/octokerbs/chronocode/internal/app/command"
+	"github.com/octokerbs/chronocode/internal/app/query"
+)
 
 type Application struct {
 	Commands Commands
@@ -8,8 +11,9 @@ type Application struct {
 }
 
 type Commands struct {
-	AnalyzeRepo command.AnalyzeRepo
+	AnalyzeRepo command.AnalyzeRepoHandler
 }
 
 type Queries struct {
+	GetSubcommits query.GetSubcommitsHandler
 }
