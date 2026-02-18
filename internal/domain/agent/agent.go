@@ -11,7 +11,9 @@ var (
 
 type AnalysisResult struct {
 	Title            string
+	Idea             string
 	Description      string
+	Epic             string
 	ModificationType string
 	Files            []string
 }

@@ -9,7 +9,7 @@ import (
 )
 
 type GetSubcommits struct {
-	RepoURL     string
+	RepoID      int64
 	AccessToken string
 }
 
@@ -24,17 +24,17 @@ func NewGetSubcommitsHandler(repoRepository repo.Repository, subcommitRepository
 }
 
 func (gs *GetSubcommitsHandler) Handle(ctx context.Context, cmd GetSubcommits) ([]subcommit.Subcommit, error) {
+	foundRepo, err := gs.repoRepository.GetRepoByID(ctx, cmd.RepoID)
+	if err != nil {
+		return nil, err
+	}
+
 	codeHost, err := gs.codeHostFactory.Create(ctx, cmd.AccessToken)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := codeHost.CanAccessRepo(ctx, cmd.RepoURL); err != nil {
-		return nil, err
-	}
-
-	foundRepo, err := gs.repoRepository.GetRepo(ctx, cmd.RepoURL)
-	if err != nil {
+	if err := codeHost.CanAccessRepo(ctx, foundRepo.URL()); err != nil {
 		return nil, err
 	}
 

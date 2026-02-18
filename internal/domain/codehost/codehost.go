@@ -19,6 +19,20 @@ type CommitReference struct {
 	CommittedAt time.Time
 }
 
+type UserProfile struct {
+	ID        int64
+	Login     string
+	Name      string
+	AvatarURL string
+	Email     string
+}
+
+type RepoSearchResult struct {
+	ID   int64
+	Name string
+	URL  string
+}
+
 type CodeHostFactory interface {
 	Create(ctx context.Context, accessToken string) (CodeHost, error)
 }
@@ -31,4 +45,6 @@ type CodeHost interface {
 	// sent) or "" if no commits were sent.
 	GetRepoCommitSHAsIntoChannel(ctx context.Context, repo *repo.Repo, commits chan<- CommitReference) (headSHA string, err error)
 	GetCommitDiff(ctx context.Context, repo *repo.Repo, commitSHA string) (string, error)
+	GetAuthenticatedUser(ctx context.Context) (*UserProfile, error)
+	SearchRepositories(ctx context.Context, query string) ([]RepoSearchResult, error)
 }

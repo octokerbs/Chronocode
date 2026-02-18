@@ -32,31 +32,31 @@ func NewAnalyzeRepoHandler(repoRepository repo.Repository, subcommitRepository s
 	return AnalyzeRepoHandler{repoRepository: repoRepository, subcommitRepository: subcommitRepository, agent: agent, codeHostFactory: codeHostFactory, locker: locker}
 }
 
-func (s *AnalyzeRepoHandler) Handle(ctx context.Context, cmd AnalyzeRepo) error {
+func (s *AnalyzeRepoHandler) Handle(ctx context.Context, cmd AnalyzeRepo) (int64, error) {
 	codeHost, err := s.codeHostFactory.Create(ctx, cmd.AccessToken)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if err := codeHost.CanAccessRepo(ctx, cmd.RepoURL); err != nil {
-		return err
+		return 0, err
 	}
 
 	release, err := s.locker.Acquire(ctx, cmd.RepoURL)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 
 	newRepo, err := s.repoRepository.GetRepo(ctx, cmd.RepoURL)
 	if err != nil {
 		if !errors.Is(err, repo.ErrRepositoryNotFound) {
-			return err
+			return 0, err
 		}
 
 		newRepo, err = codeHost.CreateRepoFromURL(ctx, cmd.RepoURL)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 
@@ -94,7 +94,7 @@ func (s *AnalyzeRepoHandler) Handle(ctx context.Context, cmd AnalyzeRepo) error 
 	wg.Wait()
 
 	if fetchErr != nil {
-		return fetchErr
+		return 0, fetchErr
 	}
 
 	if analysisErr == nil && storageErr == nil && headSHA != "" {
@@ -102,10 +102,10 @@ func (s *AnalyzeRepoHandler) Handle(ctx context.Context, cmd AnalyzeRepo) error 
 	}
 
 	if err := s.repoRepository.StoreRepo(ctx, newRepo); err != nil {
-		return err
+		return 0, err
 	}
 
-	return errors.Join(analysisErr, storageErr)
+	return newRepo.ID(), errors.Join(analysisErr, storageErr)
 }
 
 func (s *AnalyzeRepoHandler) analyzeCommits(ctx context.Context, codeHost codehost.CodeHost, r *repo.Repo, commitRefs <-chan codehost.CommitReference, subcommits chan<- subcommit.Subcommit) error {
@@ -158,7 +158,7 @@ func (s *AnalyzeRepoHandler) analyzeCommits(ctx context.Context, codeHost codeho
 			}
 
 			for _, result := range results {
-				subcommits <- subcommit.NewSubcommit(result.Title, result.Description, result.ModificationType, ref.SHA, result.Files, r.ID(), ref.CommittedAt)
+				subcommits <- subcommit.NewSubcommit(result.Title, result.Idea, result.Description, result.Epic, result.ModificationType, ref.SHA, result.Files, r.ID(), ref.CommittedAt)
 			}
 		}(ref)
 	}

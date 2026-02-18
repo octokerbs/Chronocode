@@ -1,14 +1,17 @@
 package repo
 
+import "time"
+
 type Repo struct {
 	id                    int64
 	name                  string
 	url                   string
 	lastAnalyzedCommitSHA string
+	createdAt             time.Time
 }
 
-func NewRepo(id int64, name, url, lastAnalyzedCommit string) *Repo {
-	return &Repo{id, name, url, lastAnalyzedCommit}
+func NewRepo(id int64, name, url, lastAnalyzedCommit string, createdAt time.Time) *Repo {
+	return &Repo{id, name, url, lastAnalyzedCommit, createdAt}
 }
 
 // IsURL
@@ -27,6 +30,10 @@ func (r *Repo) URL() string {
 
 func (r *Repo) ID() int64 {
 	return r.id
+}
+
+func (r *Repo) CreatedAt() time.Time {
+	return r.createdAt
 }
 
 func (r *Repo) LastAnalyzedCommitSHA() string {

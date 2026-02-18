@@ -53,7 +53,10 @@ func NewApplication(ctx context.Context) app.Application {
 			AnalyzeRepo: command.NewAnalyzeRepoHandler(repoRepository, subcommitRepository, agent, codeHostFactory, locker),
 		},
 		Queries: app.Queries{
-			GetSubcommits: query.NewGetSubcommitsHandler(repoRepository, subcommitRepository, codeHostFactory),
+			GetSubcommits:   query.NewGetSubcommitsHandler(repoRepository, subcommitRepository, codeHostFactory),
+			GetRepos:        query.NewGetReposHandler(repoRepository),
+			GetUserProfile:  query.NewGetUserProfileHandler(codeHostFactory),
+			SearchUserRepos: query.NewSearchUserReposHandler(codeHostFactory),
 		},
 	}
 }

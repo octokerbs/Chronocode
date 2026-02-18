@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/github"
 	"github.com/octokerbs/chronocode/internal/domain/codehost"
@@ -63,7 +64,57 @@ func (gc *GithubCodeHost) CreateRepoFromURL(ctx context.Context, repoURL string)
 		return nil, err
 	}
 
-	return repo.NewRepo(*ghRepo.ID, *ghRepo.FullName, repoURL, ""), nil
+	return repo.NewRepo(*ghRepo.ID, *ghRepo.FullName, repoURL, "", time.Now()), nil
+}
+
+func (gc *GithubCodeHost) GetAuthenticatedUser(ctx context.Context) (*codehost.UserProfile, error) {
+	user, _, err := gc.client.Users.Get(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+
+	profile := &codehost.UserProfile{
+		ID:    int64(*user.ID),
+		Login: *user.Login,
+	}
+	if user.Name != nil {
+		profile.Name = *user.Name
+	}
+	if user.AvatarURL != nil {
+		profile.AvatarURL = *user.AvatarURL
+	}
+	if user.Email != nil {
+		profile.Email = *user.Email
+	}
+	return profile, nil
+}
+
+func (gc *GithubCodeHost) SearchRepositories(ctx context.Context, query string) ([]codehost.RepoSearchResult, error) {
+	opts := &github.RepositoryListOptions{
+		ListOptions: github.ListOptions{PerPage: 20},
+		Sort:        "updated",
+	}
+
+	repos, _, err := gc.client.Repositories.List(ctx, "", opts)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []codehost.RepoSearchResult
+	for _, r := range repos {
+		if r.FullName == nil || r.HTMLURL == nil {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(*r.FullName), strings.ToLower(query)) {
+			continue
+		}
+		results = append(results, codehost.RepoSearchResult{
+			ID:   int64(*r.ID),
+			Name: *r.FullName,
+			URL:  *r.HTMLURL,
+		})
+	}
+	return results, nil
 }
 
 func (gc *GithubCodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, r *repo.Repo, commits chan<- codehost.CommitReference) (string, error) {

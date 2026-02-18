@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/octokerbs/chronocode/internal/adapters"
 	"github.com/octokerbs/chronocode/internal/domain/codehost"
@@ -33,23 +34,25 @@ func (s *GetSubcommitsTestSuite) SetupTest() {
 }
 
 func (s *GetSubcommitsTestSuite) TestCannotGetSubcommitsWithoutAccessToken() {
-	_, err := s.handler.Handle(context.Background(), GetSubcommits{adapters.ValidRepoURL, ""})
+	_ = s.repoRepository.StoreRepo(context.Background(), repo.NewRepo(adapters.ValidRepoID, "chronocode", adapters.ValidRepoURL, "", time.Time{}))
+	_, err := s.handler.Handle(context.Background(), GetSubcommits{adapters.ValidRepoID, ""})
 	assert.NotNil(s.T(), err)
 }
 
 func (s *GetSubcommitsTestSuite) TestCannotGetSubcommitsForInaccessibleRepo() {
-	_, err := s.handler.Handle(context.Background(), GetSubcommits{adapters.ForbiddenRepoURL, adapters.ValidAccessToken})
+	_ = s.repoRepository.StoreRepo(context.Background(), repo.NewRepo(adapters.ForbiddenRepoID, "forbidden", adapters.ForbiddenRepoURL, "", time.Time{}))
+	_, err := s.handler.Handle(context.Background(), GetSubcommits{adapters.ForbiddenRepoID, adapters.ValidAccessToken})
 	assert.True(s.T(), errors.Is(err, codehost.ErrAccessDenied))
 }
 
 func (s *GetSubcommitsTestSuite) TestCannotGetSubcommitsForNonExistentRepo() {
-	_, err := s.handler.Handle(context.Background(), GetSubcommits{adapters.ValidRepoURL, adapters.ValidAccessToken})
+	_, err := s.handler.Handle(context.Background(), GetSubcommits{adapters.ValidRepoID, adapters.ValidAccessToken})
 	assert.True(s.T(), errors.Is(err, repo.ErrRepositoryNotFound))
 }
 
 func (s *GetSubcommitsTestSuite) TestReturnsSubcommitsForExistingRepo() {
-	_ = s.repoRepository.StoreRepo(context.Background(), repo.NewRepo(adapters.ValidRepoID, "chronocode", adapters.ValidRepoURL, "FFFFFF"))
-	subcommits, err := s.handler.Handle(context.Background(), GetSubcommits{adapters.ValidRepoURL, adapters.ValidAccessToken})
+	_ = s.repoRepository.StoreRepo(context.Background(), repo.NewRepo(adapters.ValidRepoID, "chronocode", adapters.ValidRepoURL, "FFFFFF", time.Time{}))
+	subcommits, err := s.handler.Handle(context.Background(), GetSubcommits{adapters.ValidRepoID, adapters.ValidAccessToken})
 
 	assert.Nil(s.T(), err)
 	assert.Empty(s.T(), subcommits)

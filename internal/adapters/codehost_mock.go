@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/octokerbs/chronocode/internal/domain/codehost"
@@ -21,8 +22,9 @@ var (
 	ValidEmptyRepoURL      = "https/emptyRepo"
 	ValidEmptyRepoID int64 = 9876543221
 
-	InvalidRepoURL   = "https/invalidRepo"
-	ForbiddenRepoURL = "https/forbiddenRepo"
+	InvalidRepoURL         = "https/invalidRepo"
+	ForbiddenRepoURL       = "https/forbiddenRepo"
+	ForbiddenRepoID  int64 = 333333333
 
 	FailingAgentRepoURL      = "https/failingAgentRepo"
 	FailingAgentRepoID int64 = 111111111
@@ -36,6 +38,8 @@ var (
 	InvalidAccessToken = "invalid-token"
 	ValidCommitDiff    = "diff --git a/main.go b/main.go\n+func main() {}"
 	FailingDiff        = "failing-diff"
+
+	MockRepoCreatedAt = time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 )
 
 type CodeHostFactory struct{}
@@ -72,21 +76,20 @@ func (c *CodeHost) CreateRepoFromURL(ctx context.Context, url string) (*repo.Rep
 	}
 
 	if url == ValidEmptyRepoURL {
-		return repo.NewRepo(ValidEmptyRepoID, "empty-repo", ValidEmptyRepoURL, ""), nil
+		return repo.NewRepo(ValidEmptyRepoID, "empty-repo", ValidEmptyRepoURL, "", MockRepoCreatedAt), nil
 	}
 
 	if url == FailingAgentRepoURL {
-		return repo.NewRepo(FailingAgentRepoID, "failing-agent", FailingAgentRepoURL, ""), nil
+		return repo.NewRepo(FailingAgentRepoID, "failing-agent", FailingAgentRepoURL, "", MockRepoCreatedAt), nil
 	}
 
 	if url == PartialFailureRepoURL {
-		return repo.NewRepo(PartialFailureRepoID, "partial-failure", PartialFailureRepoURL, ""), nil
+		return repo.NewRepo(PartialFailureRepoID, "partial-failure", PartialFailureRepoURL, "", MockRepoCreatedAt), nil
 	}
 
-	return repo.NewRepo(ValidRepoID, "chronocode", ValidRepoURL, ""), nil
+	return repo.NewRepo(ValidRepoID, "chronocode", ValidRepoURL, "", MockRepoCreatedAt), nil
 }
 
-// commitsForRepo returns non-merge commits newest-first for the given repo.
 func (c *CodeHost) commitsForRepo(r *repo.Repo) []codehost.CommitReference {
 	switch r.URL() {
 	case ValidEmptyRepoURL:
@@ -132,4 +135,33 @@ func (c *CodeHost) GetCommitDiff(ctx context.Context, r *repo.Repo, commitSHA st
 	}
 
 	return ValidCommitDiff, nil
+}
+
+func (c *CodeHost) GetAuthenticatedUser(ctx context.Context) (*codehost.UserProfile, error) {
+	return &codehost.UserProfile{
+		ID:        1,
+		Login:     "testuser",
+		Name:      "Test User",
+		AvatarURL: "https://example.com/avatar.png",
+		Email:     "test@example.com",
+	}, nil
+}
+
+func (c *CodeHost) SearchRepositories(ctx context.Context, query string) ([]codehost.RepoSearchResult, error) {
+	all := []codehost.RepoSearchResult{
+		{ID: ValidRepoID, Name: "chronocode", URL: ValidRepoURL},
+		{ID: ValidEmptyRepoID, Name: "empty-repo", URL: ValidEmptyRepoURL},
+	}
+
+	if query == "" {
+		return all, nil
+	}
+
+	var results []codehost.RepoSearchResult
+	for _, r := range all {
+		if strings.Contains(strings.ToLower(r.Name), strings.ToLower(query)) {
+			results = append(results, r)
+		}
+	}
+	return results, nil
 }

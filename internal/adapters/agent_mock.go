@@ -18,6 +18,6 @@ func (a *Agent) AnalyzeDiff(ctx context.Context, diff string) ([]agent.AnalysisR
 	}
 
 	return []agent.AnalysisResult{
-		{Title: "title", Description: "description", ModificationType: "feat", Files: []string{}},
+		{Title: "title", Idea: "idea", Description: "description", Epic: "epic", ModificationType: "FEATURE", Files: []string{}},
 	}, nil
 }

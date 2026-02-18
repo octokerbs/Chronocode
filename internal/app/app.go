@@ -15,5 +15,8 @@ type Commands struct {
 }
 
 type Queries struct {
-	GetSubcommits query.GetSubcommitsHandler
+	GetSubcommits   query.GetSubcommitsHandler
+	GetRepos        query.GetReposHandler
+	GetUserProfile  query.GetUserProfileHandler
+	SearchUserRepos query.SearchUserReposHandler
 }

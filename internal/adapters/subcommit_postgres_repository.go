@@ -24,7 +24,7 @@ func NewPostgresSubcommitRepository(db *sql.DB) (*PostgresSubcommitRepository, e
 
 func (pg *PostgresSubcommitRepository) GetSubcommits(ctx context.Context, repoID int64) ([]subcommit.Subcommit, error) {
 	const query = `
-		SELECT title, description, modification_type, commit_sha, files, repo_id, committed_at
+		SELECT id, title, idea, description, epic, modification_type, commit_sha, files, repo_id, committed_at
 		FROM subcommit
 		WHERE repo_id = $1
 		ORDER BY committed_at DESC`
@@ -37,16 +37,16 @@ func (pg *PostgresSubcommitRepository) GetSubcommits(ctx context.Context, repoID
 
 	var subcommits []subcommit.Subcommit
 	for rows.Next() {
-		var title, desc, modType, sha string
+		var id, rID int64
+		var title, idea, desc, epic, modType, sha string
 		var files pq.StringArray
-		var rID int64
 		var committedAt time.Time
 
-		if err := rows.Scan(&title, &desc, &modType, &sha, &files, &rID, &committedAt); err != nil {
+		if err := rows.Scan(&id, &title, &idea, &desc, &epic, &modType, &sha, &files, &rID, &committedAt); err != nil {
 			return nil, err
 		}
 
-		subcommits = append(subcommits, subcommit.NewSubcommit(title, desc, modType, sha, []string(files), rID, committedAt))
+		subcommits = append(subcommits, subcommit.NewSubcommitFromDB(id, title, idea, desc, epic, modType, sha, []string(files), rID, committedAt))
 	}
 
 	return subcommits, rows.Err()
@@ -62,12 +62,12 @@ func (pg *PostgresSubcommitRepository) HasSubcommitsForCommit(ctx context.Contex
 
 func (pg *PostgresSubcommitRepository) StoreSubcommits(ctx context.Context, subcommits <-chan subcommit.Subcommit) error {
 	const query = `
-		INSERT INTO subcommit (title, description, modification_type, commit_sha, files, repo_id, committed_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`
+		INSERT INTO subcommit (title, idea, description, epic, modification_type, commit_sha, files, repo_id, committed_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
 	for sc := range subcommits {
 		_, err := pg.db.ExecContext(ctx, query,
-			sc.Title(), sc.Description(), sc.ModificationType(), sc.CommitSHA(),
+			sc.Title(), sc.Idea(), sc.Description(), sc.Epic(), sc.ModificationType(), sc.CommitSHA(),
 			pq.Array(sc.Files()), sc.RepoID(), sc.CommittedAt())
 		if err != nil {
 			return err

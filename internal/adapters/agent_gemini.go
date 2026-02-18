@@ -31,7 +31,9 @@ func NewGeminiAgent(client *genai.Client, model string) (*GeminiAgent, error) {
 
 type subcommitResponse struct {
 	Title            string   `json:"title"`
+	Idea             string   `json:"idea"`
 	Description      string   `json:"description"`
+	Epic             string   `json:"epic"`
 	ModificationType string   `json:"type"`
 	Files            []string `json:"files"`
 }
@@ -57,7 +59,9 @@ func (ga *GeminiAgent) AnalyzeDiff(ctx context.Context, diff string) ([]agent.An
 	for i, sc := range response.Subcommits {
 		results[i] = agent.AnalysisResult{
 			Title:            sc.Title,
+			Idea:             sc.Idea,
 			Description:      sc.Description,
+			Epic:             sc.Epic,
 			ModificationType: sc.ModificationType,
 			Files:            sc.Files,
 		}
@@ -88,14 +92,22 @@ func (ga *GeminiAgent) subcommitSchema() *genai.Schema {
 				Type:        genai.TypeString,
 				Description: "A concise, specific title (5-10 words) that precisely captures what this logical unit of work accomplishes.",
 			},
+			"idea": {
+				Type:        genai.TypeString,
+				Description: "A one-sentence thesis explaining the core motivation or reasoning behind this change.",
+			},
 			"description": {
 				Type:        genai.TypeString,
 				Description: "A technical explanation detailing implementation specifics and what problem it solves.",
 			},
+			"epic": {
+				Type:        genai.TypeString,
+				Description: "A broad initiative or project area label this change belongs to (e.g. 'Authentication', 'Performance', 'CI/CD').",
+			},
 			"type": {
 				Type:        genai.TypeString,
 				Description: "The primary category that best represents the nature of this change.",
-				Enum:        []string{"FEATURE", "BUG", "REFACTOR", "DOCS", "CHORE"},
+				Enum:        []string{"FEATURE", "BUG", "REFACTOR", "DOCS", "CHORE", "MILESTONE", "WARNING"},
 			},
 			"files": {
 				Type: genai.TypeArray,
@@ -105,7 +117,7 @@ func (ga *GeminiAgent) subcommitSchema() *genai.Schema {
 				Description: "An array of file names that are directly related to this subcommit.",
 			},
 		},
-		Required: []string{"title", "description", "type", "files"},
+		Required: []string{"title", "idea", "description", "epic", "type", "files"},
 	}
 }
 
@@ -113,7 +125,13 @@ func (ga *GeminiAgent) commitAnalysisPrompt() string {
 	return `You are a Commit Expert Analyzer specializing in code analysis and software development patterns.
 You will receive a Git Commit diff.
 Your task is to identify the logical units of work ("SubCommits") within this single commit.
-Each subcommit should have a title, description, type, and list of related files.
+Each subcommit should have:
+- title: A concise title (5-10 words)
+- idea: A one-sentence thesis explaining the core motivation behind this change
+- description: A technical explanation of the implementation
+- epic: A broad initiative label (e.g. "Authentication", "Performance", "CI/CD")
+- type: One of FEATURE, BUG, REFACTOR, DOCS, CHORE, MILESTONE, WARNING
+- files: List of related file names
 
 Now extract the subcommits from the following diff:
 `
