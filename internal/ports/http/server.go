@@ -1,6 +1,7 @@
 package http
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/octokerbs/chronocode/internal/app"
@@ -32,7 +33,12 @@ func NewServer(application app.Application, oauthConfig *oauth2.Config, frontend
 
 	mux.Handle("/", AuthMiddleware(protected))
 
-	handler := CORSMiddleware(frontendURL)(mux)
+	handler := RequestLoggingMiddleware(CORSMiddleware(frontendURL)(mux))
+
+	slog.Info("HTTP server configured", "port", port, "frontend_url", frontendURL, "routes", []string{
+		"GET /auth/status", "GET /auth/github/login", "GET /auth/github/callback", "POST /auth/logout",
+		"GET /user/profile", "GET /user/repos/search", "GET /repositories", "POST /analyze", "GET /subcommits-timeline",
+	})
 
 	return &http.Server{
 		Addr:    ":" + port,

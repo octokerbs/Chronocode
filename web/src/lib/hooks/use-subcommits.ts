@@ -10,6 +10,8 @@ export function useSubcommits(repoId: string | null) {
 
   return {
     subcommits: data?.subcommits ?? [],
+    isAnalyzing: data?.isAnalyzing ?? false,
+    repoUrl: data?.repoUrl ?? "",
     isLoading,
     error,
     refresh: mutate,

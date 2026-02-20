@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence } from "framer-motion";
 import { SubcommitCard } from "./subcommit-card";
 import type { Subcommit } from "@/lib/types";
 
@@ -24,13 +25,16 @@ export function DayGroup({ date, subcommits, onCardClick }: DayGroupProps) {
         </h3>
       </div>
       <div className="flex flex-col gap-3 px-1">
-        {subcommits.map((sc) => (
-          <SubcommitCard
-            key={sc.id}
-            subcommit={sc}
-            onClick={() => onCardClick(sc)}
-          />
-        ))}
+        <AnimatePresence>
+          {subcommits.map((sc, i) => (
+            <SubcommitCard
+              key={sc.id}
+              subcommit={sc}
+              onClick={() => onCardClick(sc)}
+              index={i}
+            />
+          ))}
+        </AnimatePresence>
       </div>
     </div>
   );

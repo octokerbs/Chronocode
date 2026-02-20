@@ -1,23 +1,31 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { NewAnalysisForm } from "@/components/home/new-analysis-form";
 import { RepositoryGrid } from "@/components/home/repository-grid";
-import { AnalysisProgressModal } from "@/components/home/analysis-progress-modal";
+import { AnalysisErrorDialog } from "@/components/home/analysis-error-dialog";
 import { useRepositories } from "@/lib/hooks/use-repositories";
 import { useAnalysis } from "@/lib/hooks/use-analysis";
 
 export default function HomePage() {
+  const router = useRouter();
   const { repositories, isLoading, refresh } = useRepositories();
-  const { isAnalyzing, repoId, step, error, startAnalysis, reset } =
-    useAnalysis();
+  const { isAnalyzing, repoId, error, startAnalysis, reset } = useAnalysis();
+
+  useEffect(() => {
+    if (repoId) {
+      refresh();
+      router.push(`/timeline/${repoId}`);
+    }
+  }, [repoId, router, refresh]);
 
   function handleAnalyze(repoUrl: string) {
     startAnalysis(repoUrl);
   }
 
-  function handleModalClose() {
+  function handleErrorClose() {
     reset();
-    refresh();
   }
 
   return (
@@ -36,12 +44,10 @@ export default function HomePage() {
         <RepositoryGrid repositories={repositories} isLoading={isLoading} />
       </div>
 
-      <AnalysisProgressModal
-        open={isAnalyzing}
-        step={step}
-        repoId={repoId}
+      <AnalysisErrorDialog
+        open={!!error}
         error={error}
-        onClose={handleModalClose}
+        onClose={handleErrorClose}
       />
     </div>
   );

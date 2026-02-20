@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 
 	httpport "github.com/octokerbs/chronocode/internal/ports/http"
@@ -12,6 +13,14 @@ import (
 )
 
 func main() {
+	logLevel := slog.LevelInfo
+	if os.Getenv("LOG_LEVEL") == "debug" {
+		logLevel = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})))
+
+	slog.Info("Chronocode server starting", "log_level", logLevel.String())
+
 	ctx := context.Background()
 	application := service.NewApplication(ctx)
 
@@ -22,6 +31,11 @@ func main() {
 		Scopes:       []string{"read:user", "user:email", "repo"},
 		Endpoint:     github.Endpoint,
 	}
+
+	slog.Info("GitHub OAuth configured",
+		"client_id", os.Getenv("GITHUB_CLIENT_ID"),
+		"redirect_url", os.Getenv("GITHUB_REDIRECT_URL"),
+	)
 
 	frontendURL := os.Getenv("FRONTEND_URL")
 	if frontendURL == "" {
@@ -35,6 +49,6 @@ func main() {
 
 	server := httpport.NewServer(application, oauthConfig, frontendURL, port)
 
-	log.Printf("Starting server on :%s", port)
+	slog.Info("Chronocode server ready", "port", port, "frontend_url", frontendURL)
 	log.Fatal(server.ListenAndServe())
 }

@@ -69,8 +69,10 @@ export const api = {
     }),
 
   getSubcommitsTimeline: (repoId: string) =>
-    request<{ subcommits: Subcommit[]; repoId: string }>(
-      "/subcommits-timeline",
-      { params: { repo_id: repoId } },
-    ),
+    request<{
+      subcommits: Subcommit[];
+      repoId: string;
+      repoUrl: string;
+      isAnalyzing: boolean;
+    }>("/subcommits-timeline", { params: { repo_id: repoId } }),
 };

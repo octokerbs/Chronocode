@@ -10,13 +10,16 @@ export default function TimelinePage({
   params: Promise<{ repoId: string }>;
 }) {
   const { repoId } = use(params);
-  const { subcommits, isLoading } = useSubcommits(repoId);
+  const { subcommits, isLoading, isAnalyzing, repoUrl } =
+    useSubcommits(repoId);
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
       <TimelineContainer
         subcommits={subcommits}
         isLoading={isLoading}
+        isAnalyzing={isAnalyzing}
+        repoUrl={repoUrl}
       />
     </div>
   );

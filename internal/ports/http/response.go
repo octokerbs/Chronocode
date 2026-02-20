@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/octokerbs/chronocode/internal/domain/analysis"
@@ -18,6 +19,7 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 
 func writeError(w http.ResponseWriter, err error) {
 	status, message := mapDomainError(err)
+	slog.Warn("HTTP error response", "status", status, "message", message, "error", err)
 	writeJSON(w, status, map[string]string{"error": message})
 }
 

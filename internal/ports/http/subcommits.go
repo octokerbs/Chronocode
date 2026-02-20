@@ -1,6 +1,7 @@
 package http
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -34,23 +35,33 @@ func (h *SubcommitsHandler) GetTimeline(w http.ResponseWriter, r *http.Request) 
 	repoIDStr := r.URL.Query().Get("repo_id")
 	repoID, err := strconv.ParseInt(repoIDStr, 10, 64)
 	if err != nil {
+		slog.Warn("Invalid repo_id in subcommits-timeline request", "repo_id_raw", repoIDStr, "error", err)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid repo_id"})
 		return
 	}
 
+	slog.Info("Fetching subcommits timeline", "repo_id", repoID)
+
 	token := AccessTokenFromContext(r.Context())
-	subcommits, err := h.app.Queries.GetSubcommits.Handle(r.Context(), query.GetSubcommits{
+	result, err := h.app.Queries.GetSubcommits.Handle(r.Context(), query.GetSubcommits{
 		RepoID:      repoID,
 		AccessToken: token,
 	})
 	if err != nil {
+		slog.Error("Failed to fetch subcommits timeline", "repo_id", repoID, "error", err)
 		writeError(w, err)
 		return
 	}
 
+	isAnalyzing := h.app.Locker.IsLocked(r.Context(), result.RepoURL)
+
+	slog.Info("Subcommits timeline fetched", "repo_id", repoID, "count", len(result.Subcommits), "is_analyzing", isAnalyzing)
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"subcommits": mapSubcommits(subcommits),
-		"repoId":     repoIDStr,
+		"subcommits":  mapSubcommits(result.Subcommits),
+		"repoId":      repoIDStr,
+		"repoUrl":     result.RepoURL,
+		"isAnalyzing": isAnalyzing,
 	})
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/octokerbs/chronocode/internal/domain/agent"
@@ -26,6 +27,7 @@ func NewGeminiAgent(client *genai.Client, model string) (*GeminiAgent, error) {
 	generativeModel := client.GenerativeModel(model)
 	generativeModel.ResponseMIMEType = "application/json"
 
+	slog.Info("Gemini agent initialized", "model", model)
 	return &GeminiAgent{client: client, generativeModel: generativeModel}, nil
 }
 
@@ -43,15 +45,19 @@ type analysisResponse struct {
 }
 
 func (ga *GeminiAgent) AnalyzeDiff(ctx context.Context, diff string) ([]agent.AnalysisResult, error) {
+	slog.Debug("Gemini analyzing diff", "diff_length", len(diff))
+
 	prompt := ga.commitAnalysisPrompt() + diff
 
 	text, err := ga.generateStructuredContent(ctx, prompt, ga.analysisSchema())
 	if err != nil {
+		slog.Error("Gemini content generation failed", "error", err, "diff_length", len(diff))
 		return nil, err
 	}
 
 	var response analysisResponse
 	if err := json.Unmarshal(text, &response); err != nil {
+		slog.Error("Failed to unmarshal Gemini response", "error", err, "response_length", len(text))
 		return nil, err
 	}
 
@@ -67,6 +73,7 @@ func (ga *GeminiAgent) AnalyzeDiff(ctx context.Context, diff string) ([]agent.An
 		}
 	}
 
+	slog.Debug("Gemini analysis completed", "subcommits_produced", len(results), "diff_length", len(diff))
 	return results, nil
 }
 
@@ -140,16 +147,21 @@ Now extract the subcommits from the following diff:
 func (ga *GeminiAgent) generateStructuredContent(ctx context.Context, prompt string, schema *genai.Schema) ([]byte, error) {
 	ga.generativeModel.ResponseSchema = schema
 
+	slog.Debug("Sending request to Gemini API", "prompt_length", len(prompt))
+
 	resp, err := ga.generativeModel.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
+		slog.Error("Gemini API request failed", "error", err)
 		return nil, err
 	}
 
 	for _, part := range resp.Candidates[0].Content.Parts {
 		if text, ok := part.(genai.Text); ok {
+			slog.Debug("Gemini API response received", "response_length", len(text))
 			return []byte(text), nil
 		}
 	}
 
+	slog.Error("Gemini API returned no text content in response")
 	return nil, errors.New("no text content in response")
 }

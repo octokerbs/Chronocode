@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/lib/pq"
@@ -29,8 +30,11 @@ func (pg *PostgresSubcommitRepository) GetSubcommits(ctx context.Context, repoID
 		WHERE repo_id = $1
 		ORDER BY committed_at DESC`
 
+	slog.Debug("Querying subcommits from database", "repo_id", repoID)
+
 	rows, err := pg.db.QueryContext(ctx, query, repoID)
 	if err != nil {
+		slog.Error("Database error querying subcommits", "repo_id", repoID, "error", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -43,12 +47,14 @@ func (pg *PostgresSubcommitRepository) GetSubcommits(ctx context.Context, repoID
 		var committedAt time.Time
 
 		if err := rows.Scan(&id, &title, &idea, &desc, &epic, &modType, &sha, &files, &rID, &committedAt); err != nil {
+			slog.Error("Database error scanning subcommit row", "repo_id", repoID, "error", err)
 			return nil, err
 		}
 
 		subcommits = append(subcommits, subcommit.NewSubcommitFromDB(id, title, idea, desc, epic, modType, sha, []string(files), rID, committedAt))
 	}
 
+	slog.Debug("Subcommits fetched from database", "repo_id", repoID, "count", len(subcommits))
 	return subcommits, rows.Err()
 }
 
@@ -57,6 +63,9 @@ func (pg *PostgresSubcommitRepository) HasSubcommitsForCommit(ctx context.Contex
 
 	var exists bool
 	err := pg.db.QueryRowContext(ctx, query, repoID, commitSHA).Scan(&exists)
+	if err != nil {
+		slog.Error("Database error checking subcommits for commit", "repo_id", repoID, "commit_sha", commitSHA, "error", err)
+	}
 	return exists, err
 }
 
@@ -65,14 +74,18 @@ func (pg *PostgresSubcommitRepository) StoreSubcommits(ctx context.Context, subc
 		INSERT INTO subcommit (title, idea, description, epic, modification_type, commit_sha, files, repo_id, committed_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
+	var count int
 	for sc := range subcommits {
 		_, err := pg.db.ExecContext(ctx, query,
 			sc.Title(), sc.Idea(), sc.Description(), sc.Epic(), sc.ModificationType(), sc.CommitSHA(),
 			pq.Array(sc.Files()), sc.RepoID(), sc.CommittedAt())
 		if err != nil {
+			slog.Error("Database error storing subcommit", "repo_id", sc.RepoID(), "commit_sha", sc.CommitSHA(), "title", sc.Title(), "error", err)
 			return err
 		}
+		count++
 	}
 
+	slog.Info("Subcommits stored in database", "count", count)
 	return nil
 }

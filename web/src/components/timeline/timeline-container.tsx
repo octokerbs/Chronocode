@@ -5,13 +5,14 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { DayGroup } from "./day-group";
 import { SubcommitDetailPanel } from "./subcommit-detail-panel";
 import { FilterBar } from "./filter-bar";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AnalysisStatus } from "./analysis-status";
 import { Loader2 } from "lucide-react";
 import type { Subcommit, SubcommitType } from "@/lib/types";
 
 interface TimelineContainerProps {
   subcommits: Subcommit[];
   isLoading: boolean;
+  isAnalyzing?: boolean;
   repoUrl?: string;
 }
 
@@ -30,6 +31,7 @@ function groupByDay(subcommits: Subcommit[]): Map<string, Subcommit[]> {
 export function TimelineContainer({
   subcommits,
   isLoading,
+  isAnalyzing = false,
   repoUrl,
 }: TimelineContainerProps) {
   const [activeTypes, setActiveTypes] = useState<Set<SubcommitType>>(
@@ -111,7 +113,7 @@ export function TimelineContainer({
     );
   }
 
-  if (subcommits.length === 0) {
+  if (subcommits.length === 0 && !isLoading) {
     return (
       <>
         <FilterBar
@@ -126,13 +128,22 @@ export function TimelineContainer({
         />
         <div className="flex items-center justify-center py-32">
           <div className="flex flex-col items-center gap-4">
-            <Skeleton className="h-6 w-48" />
-            <p className="text-sm text-muted-foreground">
-              Analysis in progress... subcommits will appear as they are
-              processed.
-            </p>
+            {isAnalyzing ? (
+              <>
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Analyzing commits... subcommits will appear as they are
+                  processed.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No subcommits found for this repository.
+              </p>
+            )}
           </div>
         </div>
+        <AnalysisStatus isAnalyzing={isAnalyzing} />
       </>
     );
   }
@@ -171,6 +182,8 @@ export function TimelineContainer({
         onClose={() => setSelectedSubcommit(null)}
         onSiblingClick={setSelectedSubcommit}
       />
+
+      <AnalysisStatus isAnalyzing={isAnalyzing} />
     </>
   );
 }

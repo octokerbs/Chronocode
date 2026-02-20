@@ -9,4 +9,5 @@ var ErrAnalysisInProgress = errors.New("analysis already in progress for this re
 
 type Locker interface {
 	Acquire(ctx context.Context, repoURL string) (release func(), err error)
+	IsLocked(ctx context.Context, repoURL string) bool
 }

@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ func NewGithubCodeHostFactory() *GithubCodeHostFactory {
 
 func (f *GithubCodeHostFactory) Create(ctx context.Context, accessToken string) (codehost.CodeHost, error) {
 	if accessToken == "" {
+		slog.Warn("GitHub code host creation failed - empty access token")
 		return nil, codehost.ErrAccessDenied
 	}
 
@@ -29,6 +31,7 @@ func (f *GithubCodeHostFactory) Create(ctx context.Context, accessToken string) 
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)
 
+	slog.Debug("GitHub code host client created")
 	return &GithubCodeHost{client: client}, nil
 }
 
@@ -39,17 +42,22 @@ type GithubCodeHost struct {
 func (gc *GithubCodeHost) CanAccessRepo(ctx context.Context, repoURL string) error {
 	owner, repoName, err := parseRepoURL(repoURL)
 	if err != nil {
+		slog.Warn("Invalid repo URL for access check", "repo_url", repoURL, "error", err)
 		return codehost.ErrInvalidRepoURL
 	}
 
+	slog.Debug("Checking GitHub repo access", "owner", owner, "repo", repoName)
 	_, resp, err := gc.client.Repositories.Get(ctx, owner, repoName)
 	if err != nil {
 		if resp != nil && (resp.StatusCode == 404 || resp.StatusCode == 403 || resp.StatusCode == 401) {
+			slog.Warn("GitHub repo access denied", "owner", owner, "repo", repoName, "status", resp.StatusCode)
 			return codehost.ErrAccessDenied
 		}
+		slog.Error("GitHub API error during access check", "owner", owner, "repo", repoName, "error", err)
 		return err
 	}
 
+	slog.Debug("GitHub repo access confirmed", "owner", owner, "repo", repoName)
 	return nil
 }
 
@@ -59,17 +67,22 @@ func (gc *GithubCodeHost) CreateRepoFromURL(ctx context.Context, repoURL string)
 		return nil, codehost.ErrInvalidRepoURL
 	}
 
+	slog.Debug("Fetching GitHub repo metadata", "owner", owner, "repo", repoName)
 	ghRepo, _, err := gc.client.Repositories.Get(ctx, owner, repoName)
 	if err != nil {
+		slog.Error("Failed to fetch GitHub repo metadata", "owner", owner, "repo", repoName, "error", err)
 		return nil, err
 	}
 
+	slog.Info("GitHub repo metadata fetched", "repo_id", *ghRepo.ID, "full_name", *ghRepo.FullName)
 	return repo.NewRepo(*ghRepo.ID, *ghRepo.FullName, repoURL, "", time.Now()), nil
 }
 
 func (gc *GithubCodeHost) GetAuthenticatedUser(ctx context.Context) (*codehost.UserProfile, error) {
+	slog.Debug("Fetching authenticated GitHub user")
 	user, _, err := gc.client.Users.Get(ctx, "")
 	if err != nil {
+		slog.Error("Failed to fetch authenticated GitHub user", "error", err)
 		return nil, err
 	}
 
@@ -86,10 +99,12 @@ func (gc *GithubCodeHost) GetAuthenticatedUser(ctx context.Context) (*codehost.U
 	if user.Email != nil {
 		profile.Email = *user.Email
 	}
+	slog.Info("Authenticated GitHub user fetched", "login", profile.Login, "user_id", profile.ID)
 	return profile, nil
 }
 
 func (gc *GithubCodeHost) SearchRepositories(ctx context.Context, query string) ([]codehost.RepoSearchResult, error) {
+	slog.Debug("Searching GitHub repositories", "query", query)
 	opts := &github.RepositoryListOptions{
 		ListOptions: github.ListOptions{PerPage: 20},
 		Sort:        "updated",
@@ -97,6 +112,7 @@ func (gc *GithubCodeHost) SearchRepositories(ctx context.Context, query string) 
 
 	repos, _, err := gc.client.Repositories.List(ctx, "", opts)
 	if err != nil {
+		slog.Error("Failed to list GitHub repositories", "query", query, "error", err)
 		return nil, err
 	}
 
@@ -114,6 +130,7 @@ func (gc *GithubCodeHost) SearchRepositories(ctx context.Context, query string) 
 			URL:  *r.HTMLURL,
 		})
 	}
+	slog.Info("GitHub repository search completed", "query", query, "fetched", len(repos), "matched", len(results))
 	return results, nil
 }
 
@@ -128,23 +145,34 @@ func (gc *GithubCodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, r *r
 		ListOptions: github.ListOptions{PerPage: 100},
 	}
 
+	slog.Info("Fetching commits from GitHub", "owner", owner, "repo", repoName, "last_analyzed_sha", lastSHA)
+
 	var headSHA string
+	var totalFetched, sentCount, mergeSkipped int
+	page := 0
 	for {
+		page++
 		pageCommits, resp, err := gc.client.Repositories.ListCommits(ctx, owner, repoName, opts)
 		if err != nil {
+			slog.Error("Failed to fetch commits page from GitHub", "owner", owner, "repo", repoName, "page", page, "error", err)
 			return "", err
 		}
 
+		slog.Debug("Fetched commits page", "owner", owner, "repo", repoName, "page", page, "count", len(pageCommits))
+
 		for _, commit := range pageCommits {
+			totalFetched++
 			if commit.SHA == nil {
 				continue
 			}
 
 			if *commit.SHA == lastSHA {
+				slog.Info("Reached last analyzed commit, stopping fetch", "last_sha", lastSHA, "total_fetched", totalFetched, "sent", sentCount, "merge_skipped", mergeSkipped)
 				return headSHA, nil
 			}
 
 			if len(commit.Parents) > 1 {
+				mergeSkipped++
 				continue
 			}
 
@@ -156,6 +184,7 @@ func (gc *GithubCodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, r *r
 			if headSHA == "" {
 				headSHA = ref.SHA
 			}
+			sentCount++
 			commits <- ref
 		}
 
@@ -165,6 +194,7 @@ func (gc *GithubCodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, r *r
 		opts.ListOptions.Page = resp.NextPage
 	}
 
+	slog.Info("Commit fetch completed", "owner", owner, "repo", repoName, "total_fetched", totalFetched, "sent", sentCount, "merge_skipped", mergeSkipped, "head_sha", headSHA)
 	return headSHA, nil
 }
 
@@ -174,8 +204,11 @@ func (gc *GithubCodeHost) GetCommitDiff(ctx context.Context, r *repo.Repo, commi
 		return "", codehost.ErrInvalidRepoURL
 	}
 
+	slog.Debug("Fetching commit diff", "owner", owner, "repo", repoName, "commit_sha", commitSHA)
+
 	commit, _, err := gc.client.Repositories.GetCommit(ctx, owner, repoName, commitSHA)
 	if err != nil {
+		slog.Error("Failed to fetch commit diff from GitHub", "owner", owner, "repo", repoName, "commit_sha", commitSHA, "error", err)
 		return "", err
 	}
 
@@ -186,6 +219,7 @@ func (gc *GithubCodeHost) GetCommitDiff(ctx context.Context, r *repo.Repo, commi
 		}
 	}
 
+	slog.Debug("Commit diff fetched", "commit_sha", commitSHA, "files_count", len(commit.Files), "diff_length", len(diff))
 	return diff, nil
 }
 

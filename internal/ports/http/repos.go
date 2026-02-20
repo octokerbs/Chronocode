@@ -1,6 +1,7 @@
 package http
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -19,20 +20,23 @@ func NewReposHandler(app app.Application) *ReposHandler {
 }
 
 type repoJSON struct {
-	ID                  string `json:"id"`
-	Name                string `json:"name"`
-	URL                 string `json:"url"`
-	AddedAt             string `json:"addedAt"`
-	LastAnalyzedCommit  string `json:"lastAnalyzedCommit"`
-	CreatedAt           string `json:"createdAt"`
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	URL     string `json:"url"`
+	AddedAt string `json:"addedAt"`
 }
 
 func (h *ReposHandler) List(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Listing all repositories")
+
 	repos, err := h.app.Queries.GetRepos.Handle(r.Context(), query.GetRepos{})
 	if err != nil {
+		slog.Error("Failed to list repositories", "error", err)
 		writeError(w, err)
 		return
 	}
+
+	slog.Info("Repositories listed", "count", len(repos))
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"repositories": mapRepos(repos),
@@ -43,12 +47,10 @@ func mapRepos(repos []*repo.Repo) []repoJSON {
 	result := make([]repoJSON, len(repos))
 	for i, r := range repos {
 		result[i] = repoJSON{
-			ID:                  formatInt64(r.ID()),
-			Name:                r.Name(),
-			URL:                 r.URL(),
-			AddedAt:             r.CreatedAt().Format(time.RFC3339),
-			LastAnalyzedCommit:  r.LastAnalyzedCommitSHA(),
-			CreatedAt:           r.CreatedAt().Format(time.RFC3339),
+			ID:      formatInt64(r.ID()),
+			Name:    r.Name(),
+			URL:     r.URL(),
+			AddedAt: r.CreatedAt().Format(time.RFC3339),
 		}
 	}
 	return result

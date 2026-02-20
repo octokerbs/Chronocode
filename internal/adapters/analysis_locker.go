@@ -31,3 +31,19 @@ func (l *InMemoryLocker) Acquire(_ context.Context, repoURL string) (func(), err
 
 	return func() { repoLock.Unlock() }, nil
 }
+
+func (l *InMemoryLocker) IsLocked(_ context.Context, repoURL string) bool {
+	l.mu.Lock()
+	repoLock, exists := l.locks[repoURL]
+	l.mu.Unlock()
+
+	if !exists {
+		return false
+	}
+
+	if repoLock.TryLock() {
+		repoLock.Unlock()
+		return false
+	}
+	return true
+}

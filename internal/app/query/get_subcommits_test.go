@@ -52,8 +52,9 @@ func (s *GetSubcommitsTestSuite) TestCannotGetSubcommitsForNonExistentRepo() {
 
 func (s *GetSubcommitsTestSuite) TestReturnsSubcommitsForExistingRepo() {
 	_ = s.repoRepository.StoreRepo(context.Background(), repo.NewRepo(adapters.ValidRepoID, "chronocode", adapters.ValidRepoURL, "FFFFFF", time.Time{}))
-	subcommits, err := s.handler.Handle(context.Background(), GetSubcommits{adapters.ValidRepoID, adapters.ValidAccessToken})
+	result, err := s.handler.Handle(context.Background(), GetSubcommits{adapters.ValidRepoID, adapters.ValidAccessToken})
 
 	assert.Nil(s.T(), err)
-	assert.Empty(s.T(), subcommits)
+	assert.Empty(s.T(), result.Subcommits)
+	assert.Equal(s.T(), adapters.ValidRepoURL, result.RepoURL)
 }

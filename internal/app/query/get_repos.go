@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/octokerbs/chronocode/internal/domain/repo"
 )
@@ -17,5 +18,14 @@ func NewGetReposHandler(repoRepository repo.Repository) GetReposHandler {
 }
 
 func (h *GetReposHandler) Handle(ctx context.Context, _ GetRepos) ([]*repo.Repo, error) {
-	return h.repoRepository.ListRepos(ctx)
+	slog.Info("GetRepos query received")
+
+	repos, err := h.repoRepository.ListRepos(ctx)
+	if err != nil {
+		slog.Error("Failed to list repositories", "error", err)
+		return nil, err
+	}
+
+	slog.Info("GetRepos query completed", "count", len(repos))
+	return repos, nil
 }
