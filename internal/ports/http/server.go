@@ -4,18 +4,21 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/octokerbs/chronocode/internal/app"
+	"github.com/octokerbs/chronocode/internal/application"
+	"github.com/octokerbs/chronocode/internal/ports/http/auth"
+	"github.com/octokerbs/chronocode/internal/ports/http/service"
+	"github.com/octokerbs/chronocode/internal/ports/http/utils"
 	"golang.org/x/oauth2"
 )
 
-func NewServer(application app.Application, oauthConfig *oauth2.Config, frontendURL string, port string) *http.Server {
+func NewServer(application application.Application, oauthConfig *oauth2.Config, frontendURL string, port string) *http.Server {
 	mux := http.NewServeMux()
 
-	authHandler := NewAuthHandler(oauthConfig, frontendURL)
-	analyzeHandler := NewAnalyzeHandler(application)
-	subcommitsHandler := NewSubcommitsHandler(application)
-	reposHandler := NewReposHandler(application)
-	userHandler := NewUserHandler(application)
+	authHandler := auth.NewAuthHandler(oauthConfig, frontendURL)
+	userHandler := service.NewUserHandler(application)
+	analyzeHandler := service.NewAnalyzeHandler(application)
+	subcommitsHandler := service.NewSubcommitsHandler(application)
+	reposHandler := service.NewReposHandler(application)
 
 	// Public routes
 	mux.HandleFunc("GET /auth/status", authHandler.Status)
@@ -31,9 +34,9 @@ func NewServer(application app.Application, oauthConfig *oauth2.Config, frontend
 	protected.HandleFunc("POST /analyze", analyzeHandler.Analyze)
 	protected.HandleFunc("GET /subcommits-timeline", subcommitsHandler.GetTimeline)
 
-	mux.Handle("/", AuthMiddleware(protected))
+	mux.Handle("/", utils.AuthMiddleware(protected))
 
-	handler := RequestLoggingMiddleware(CORSMiddleware(frontendURL)(mux))
+	handler := utils.RequestLoggingMiddleware(utils.CORSMiddleware(frontendURL)(mux))
 
 	slog.Info("HTTP server configured", "port", port, "frontend_url", frontendURL, "routes", []string{
 		"GET /auth/status", "GET /auth/github/login", "GET /auth/github/callback", "POST /auth/logout",

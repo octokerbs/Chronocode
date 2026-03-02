@@ -1,37 +1,38 @@
-package http
+package service
 
 import (
 	"log/slog"
 	"net/http"
 
-	"github.com/octokerbs/chronocode/internal/app"
-	"github.com/octokerbs/chronocode/internal/app/query"
+	"github.com/octokerbs/chronocode/internal/application"
+	"github.com/octokerbs/chronocode/internal/application/query"
+	"github.com/octokerbs/chronocode/internal/ports/http/utils"
 )
 
 type UserHandler struct {
-	app app.Application
+	application application.Application
 }
 
-func NewUserHandler(app app.Application) *UserHandler {
-	return &UserHandler{app: app}
+func NewUserHandler(application application.Application) *UserHandler {
+	return &UserHandler{application: application}
 }
 
 func (h *UserHandler) Profile(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Fetching user profile")
 
-	token := AccessTokenFromContext(r.Context())
-	profile, err := h.app.Queries.GetUserProfile.Handle(r.Context(), query.GetUserProfile{
+	token := utils.AccessTokenFromContext(r.Context())
+	profile, err := h.application.Queries.GetUserProfile.Handle(r.Context(), query.GetUserProfile{
 		AccessToken: token,
 	})
 	if err != nil {
 		slog.Error("Failed to fetch user profile", "error", err)
-		writeError(w, err)
+		utils.WriteError(w, err)
 		return
 	}
 
 	slog.Info("User profile fetched", "user_login", profile.Login, "user_id", profile.ID)
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	utils.WriteJSON(w, http.StatusOK, map[string]any{
 		"id":        profile.ID,
 		"login":     profile.Login,
 		"name":      profile.Name,
@@ -44,14 +45,14 @@ func (h *UserHandler) SearchRepos(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	slog.Info("Searching user repositories", "query", q)
 
-	token := AccessTokenFromContext(r.Context())
-	results, err := h.app.Queries.SearchUserRepos.Handle(r.Context(), query.SearchUserRepos{
+	token := utils.AccessTokenFromContext(r.Context())
+	results, err := h.application.Queries.SearchUserRepos.Handle(r.Context(), query.SearchUserRepos{
 		AccessToken: token,
 		Query:       q,
 	})
 	if err != nil {
 		slog.Error("Failed to search user repositories", "query", q, "error", err)
-		writeError(w, err)
+		utils.WriteError(w, err)
 		return
 	}
 
@@ -66,7 +67,7 @@ func (h *UserHandler) SearchRepos(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	utils.WriteJSON(w, http.StatusOK, map[string]any{
 		"repositories": repos,
 	})
 }

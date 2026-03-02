@@ -1,8 +1,8 @@
-package app
+package application
 
 import (
-	"github.com/octokerbs/chronocode/internal/app/command"
-	"github.com/octokerbs/chronocode/internal/app/query"
+	"github.com/octokerbs/chronocode/internal/application/command"
+	"github.com/octokerbs/chronocode/internal/application/query"
 	"github.com/octokerbs/chronocode/internal/domain/analysis"
 )
 

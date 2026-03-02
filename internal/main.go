@@ -1,22 +1,25 @@
-package service
+package main
 
 import (
 	"context"
 	"database/sql"
+	"log"
 	"log/slog"
 	"os"
 
 	"github.com/google/generative-ai-go/genai"
-	_ "github.com/lib/pq"
 	"github.com/octokerbs/chronocode/internal/adapters"
-	"github.com/octokerbs/chronocode/internal/app"
-	"github.com/octokerbs/chronocode/internal/app/command"
-	"github.com/octokerbs/chronocode/internal/app/query"
+	"github.com/octokerbs/chronocode/internal/application"
+	"github.com/octokerbs/chronocode/internal/application/command"
+	"github.com/octokerbs/chronocode/internal/application/query"
 
+	"github.com/octokerbs/chronocode/internal/ports/http"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/github"
 	"google.golang.org/api/option"
 )
 
-func NewApplication(ctx context.Context) app.Application {
+func NewApplication(ctx context.Context) application.Application {
 	slog.Info("Initializing application dependencies")
 
 	slog.Info("Connecting to Gemini AI")
@@ -63,11 +66,11 @@ func NewApplication(ctx context.Context) app.Application {
 
 	slog.Info("All dependencies initialized successfully")
 
-	return app.Application{
-		Commands: app.Commands{
+	return application.Application{
+		Commands: application.Commands{
 			AnalyzeRepo: command.NewAnalyzeRepoHandler(repoRepository, subcommitRepository, agent, codeHostFactory, locker),
 		},
-		Queries: app.Queries{
+		Queries: application.Queries{
 			GetSubcommits:   query.NewGetSubcommitsHandler(repoRepository, subcommitRepository, codeHostFactory),
 			GetRepos:        query.NewGetReposHandler(repoRepository),
 			GetUserProfile:  query.NewGetUserProfileHandler(codeHostFactory),
@@ -75,4 +78,45 @@ func NewApplication(ctx context.Context) app.Application {
 		},
 		Locker: locker,
 	}
+}
+
+func main() {
+	logLevel := slog.LevelInfo
+	if os.Getenv("LOG_LEVEL") == "debug" {
+		logLevel = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})))
+
+	slog.Info("Chronocode server starting", "log_level", logLevel.String())
+
+	ctx := context.Background()
+	application := NewApplication(ctx)
+
+	oauthConfig := &oauth2.Config{
+		ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
+		ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
+		RedirectURL:  os.Getenv("GITHUB_REDIRECT_URL"),
+		Scopes:       []string{"read:user", "user:email", "repo"},
+		Endpoint:     github.Endpoint,
+	}
+
+	slog.Info("GitHub OAuth configured",
+		"client_id", os.Getenv("GITHUB_CLIENT_ID"),
+		"redirect_url", os.Getenv("GITHUB_REDIRECT_URL"),
+	)
+
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000"
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	server := http.NewServer(application, oauthConfig, frontendURL, port)
+
+	slog.Info("Chronocode server ready", "port", port, "frontend_url", frontendURL)
+	log.Fatal(server.ListenAndServe())
 }

@@ -1,20 +1,21 @@
-package http
+package service
 
 import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
 
-	"github.com/octokerbs/chronocode/internal/app"
-	"github.com/octokerbs/chronocode/internal/app/command"
+	"github.com/octokerbs/chronocode/internal/application"
+	"github.com/octokerbs/chronocode/internal/application/command"
+	"github.com/octokerbs/chronocode/internal/ports/http/utils"
 )
 
 type AnalyzeHandler struct {
-	app app.Application
+	application application.Application
 }
 
-func NewAnalyzeHandler(app app.Application) *AnalyzeHandler {
-	return &AnalyzeHandler{app: app}
+func NewAnalyzeHandler(application application.Application) *AnalyzeHandler {
+	return &AnalyzeHandler{application: application}
 }
 
 func (h *AnalyzeHandler) Analyze(w http.ResponseWriter, r *http.Request) {
@@ -23,26 +24,26 @@ func (h *AnalyzeHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		slog.Warn("Analyze request failed - invalid request body", "error", err)
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		utils.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 		return
 	}
 
 	slog.Info("Starting repository analysis", "repo_url", body.RepoURL)
 
-	token := AccessTokenFromContext(r.Context())
-	repoID, err := h.app.Commands.AnalyzeRepo.HandleAsync(r.Context(), command.AnalyzeRepo{
+	token := utils.AccessTokenFromContext(r.Context())
+	repoID, err := h.application.Commands.AnalyzeRepo.HandleAsync(r.Context(), command.AnalyzeRepo{
 		RepoURL:     body.RepoURL,
 		AccessToken: token,
 	})
 	if err != nil {
 		slog.Error("Repository analysis failed", "repo_url", body.RepoURL, "error", err)
-		writeError(w, err)
+		utils.WriteError(w, err)
 		return
 	}
 
 	slog.Info("Repository analysis started", "repo_url", body.RepoURL, "repo_id", repoID)
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	utils.WriteJSON(w, http.StatusOK, map[string]any{
 		"message": "analysis started",
 		"repoId":  repoID,
 	})

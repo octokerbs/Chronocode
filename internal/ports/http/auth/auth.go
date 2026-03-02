@@ -1,4 +1,4 @@
-package http
+package auth
 
 import (
 	"crypto/rand"
@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/octokerbs/chronocode/internal/ports/http/utils"
 	"golang.org/x/oauth2"
 )
 
@@ -23,7 +24,7 @@ func (h *AuthHandler) Status(w http.ResponseWriter, r *http.Request) {
 	_, err := r.Cookie("access_token")
 	isLoggedIn := err == nil
 	slog.Info("Auth status check", "is_logged_in", isLoggedIn, "remote_addr", r.RemoteAddr)
-	writeJSON(w, http.StatusOK, map[string]bool{"isLoggedIn": isLoggedIn})
+	utils.WriteJSON(w, http.StatusOK, map[string]bool{"isLoggedIn": isLoggedIn})
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +47,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	stateCookie, err := r.Cookie("oauth_state")
 	if err != nil || stateCookie.Value != r.URL.Query().Get("state") {
 		slog.Warn("OAuth callback failed - invalid state parameter", "has_cookie", err == nil, "remote_addr", r.RemoteAddr)
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid state"})
+		utils.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid state"})
 		return
 	}
 
@@ -63,7 +64,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	token, err := h.oauthConfig.Exchange(r.Context(), code)
 	if err != nil {
 		slog.Error("OAuth token exchange failed", "error", err, "remote_addr", r.RemoteAddr)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "token exchange failed"})
+		utils.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "token exchange failed"})
 		return
 	}
 
@@ -89,7 +90,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		MaxAge: -1,
 	})
 	slog.Info("User logged out", "remote_addr", r.RemoteAddr)
-	writeJSON(w, http.StatusOK, map[string]string{"message": "logged out"})
+	utils.WriteJSON(w, http.StatusOK, map[string]string{"message": "logged out"})
 }
 
 func generateState() string {

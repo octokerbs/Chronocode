@@ -1,4 +1,4 @@
-package http
+package utils
 
 import (
 	"context"
@@ -58,7 +58,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		cookie, err := r.Cookie("access_token")
 		if err != nil || cookie.Value == "" {
 			slog.Warn("Unauthorized request - missing or empty access_token cookie", "path", r.URL.Path, "method", r.Method, "remote_addr", r.RemoteAddr)
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			WriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
 

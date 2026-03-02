@@ -1,4 +1,4 @@
-package http
+package service
 
 import (
 	"log/slog"
@@ -6,17 +6,18 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/octokerbs/chronocode/internal/app"
-	"github.com/octokerbs/chronocode/internal/app/query"
+	"github.com/octokerbs/chronocode/internal/application"
+	"github.com/octokerbs/chronocode/internal/application/query"
 	"github.com/octokerbs/chronocode/internal/domain/repo"
+	"github.com/octokerbs/chronocode/internal/ports/http/utils"
 )
 
 type ReposHandler struct {
-	app app.Application
+	application application.Application
 }
 
-func NewReposHandler(app app.Application) *ReposHandler {
-	return &ReposHandler{app: app}
+func NewReposHandler(application application.Application) *ReposHandler {
+	return &ReposHandler{application: application}
 }
 
 type repoJSON struct {
@@ -29,16 +30,16 @@ type repoJSON struct {
 func (h *ReposHandler) List(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Listing all repositories")
 
-	repos, err := h.app.Queries.GetRepos.Handle(r.Context(), query.GetRepos{})
+	repos, err := h.application.Queries.GetRepos.Handle(r.Context(), query.GetRepos{})
 	if err != nil {
 		slog.Error("Failed to list repositories", "error", err)
-		writeError(w, err)
+		utils.WriteError(w, err)
 		return
 	}
 
 	slog.Info("Repositories listed", "count", len(repos))
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	utils.WriteJSON(w, http.StatusOK, map[string]any{
 		"repositories": mapRepos(repos),
 	})
 }

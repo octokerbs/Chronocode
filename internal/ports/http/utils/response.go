@@ -1,4 +1,4 @@
-package http
+package utils
 
 import (
 	"encoding/json"
@@ -11,16 +11,16 @@ import (
 	"github.com/octokerbs/chronocode/internal/domain/repo"
 )
 
-func writeJSON(w http.ResponseWriter, status int, data any) {
+func WriteJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
 }
 
-func writeError(w http.ResponseWriter, err error) {
+func WriteError(w http.ResponseWriter, err error) {
 	status, message := mapDomainError(err)
 	slog.Warn("HTTP error response", "status", status, "message", message, "error", err)
-	writeJSON(w, status, map[string]string{"error": message})
+	WriteJSON(w, status, map[string]string{"error": message})
 }
 
 func mapDomainError(err error) (int, string) {

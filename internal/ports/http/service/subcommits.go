@@ -1,4 +1,4 @@
-package http
+package service
 
 import (
 	"log/slog"
@@ -6,17 +6,18 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/octokerbs/chronocode/internal/app"
-	"github.com/octokerbs/chronocode/internal/app/query"
+	"github.com/octokerbs/chronocode/internal/application"
+	"github.com/octokerbs/chronocode/internal/application/query"
 	"github.com/octokerbs/chronocode/internal/domain/subcommit"
+	"github.com/octokerbs/chronocode/internal/ports/http/utils"
 )
 
 type SubcommitsHandler struct {
-	app app.Application
+	application application.Application
 }
 
-func NewSubcommitsHandler(app app.Application) *SubcommitsHandler {
-	return &SubcommitsHandler{app: app}
+func NewSubcommitsHandler(application application.Application) *SubcommitsHandler {
+	return &SubcommitsHandler{application: application}
 }
 
 type subcommitJSON struct {
@@ -36,28 +37,28 @@ func (h *SubcommitsHandler) GetTimeline(w http.ResponseWriter, r *http.Request) 
 	repoID, err := strconv.ParseInt(repoIDStr, 10, 64)
 	if err != nil {
 		slog.Warn("Invalid repo_id in subcommits-timeline request", "repo_id_raw", repoIDStr, "error", err)
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid repo_id"})
+		utils.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid repo_id"})
 		return
 	}
 
 	slog.Info("Fetching subcommits timeline", "repo_id", repoID)
 
-	token := AccessTokenFromContext(r.Context())
-	result, err := h.app.Queries.GetSubcommits.Handle(r.Context(), query.GetSubcommits{
+	token := utils.AccessTokenFromContext(r.Context())
+	result, err := h.application.Queries.GetSubcommits.Handle(r.Context(), query.GetSubcommits{
 		RepoID:      repoID,
 		AccessToken: token,
 	})
 	if err != nil {
 		slog.Error("Failed to fetch subcommits timeline", "repo_id", repoID, "error", err)
-		writeError(w, err)
+		utils.WriteError(w, err)
 		return
 	}
 
-	isAnalyzing := h.app.Locker.IsLocked(r.Context(), result.RepoURL)
+	isAnalyzing := h.application.Locker.IsLocked(r.Context(), result.RepoURL)
 
 	slog.Info("Subcommits timeline fetched", "repo_id", repoID, "count", len(result.Subcommits), "is_analyzing", isAnalyzing)
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	utils.WriteJSON(w, http.StatusOK, map[string]any{
 		"subcommits":  mapSubcommits(result.Subcommits),
 		"repoId":      repoIDStr,
 		"repoUrl":     result.RepoURL,
