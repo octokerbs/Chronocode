@@ -1,4 +1,4 @@
-package adapters
+package postgres
 
 import (
 	"context"
@@ -11,19 +11,19 @@ import (
 	"github.com/octokerbs/chronocode/internal/domain/subcommit"
 )
 
-type PostgresSubcommitRepository struct {
+type SubcommitRepository struct {
 	db *sql.DB
 }
 
-func NewPostgresSubcommitRepository(db *sql.DB) (*PostgresSubcommitRepository, error) {
+func NewPostgresSubcommitRepository(db *sql.DB) (*SubcommitRepository, error) {
 	if db == nil {
 		return nil, errors.New("missing postgres client")
 	}
 
-	return &PostgresSubcommitRepository{db: db}, nil
+	return &SubcommitRepository{db: db}, nil
 }
 
-func (pg *PostgresSubcommitRepository) GetSubcommits(ctx context.Context, repoID int64) ([]subcommit.Subcommit, error) {
+func (r *SubcommitRepository) GetSubcommits(ctx context.Context, repoID int64) ([]subcommit.Subcommit, error) {
 	const query = `
 		SELECT id, title, idea, description, epic, modification_type, commit_sha, files, repo_id, committed_at
 		FROM subcommit
@@ -32,7 +32,7 @@ func (pg *PostgresSubcommitRepository) GetSubcommits(ctx context.Context, repoID
 
 	slog.Debug("Querying subcommits from database", "repo_id", repoID)
 
-	rows, err := pg.db.QueryContext(ctx, query, repoID)
+	rows, err := r.db.QueryContext(ctx, query, repoID)
 	if err != nil {
 		slog.Error("Database error querying subcommits", "repo_id", repoID, "error", err)
 		return nil, err
@@ -58,25 +58,25 @@ func (pg *PostgresSubcommitRepository) GetSubcommits(ctx context.Context, repoID
 	return subcommits, rows.Err()
 }
 
-func (pg *PostgresSubcommitRepository) HasSubcommitsForCommit(ctx context.Context, repoID int64, commitSHA string) (bool, error) {
+func (r *SubcommitRepository) HasSubcommitsForCommit(ctx context.Context, repoID int64, commitSHA string) (bool, error) {
 	const query = `SELECT EXISTS(SELECT 1 FROM subcommit WHERE repo_id = $1 AND commit_sha = $2)`
 
 	var exists bool
-	err := pg.db.QueryRowContext(ctx, query, repoID, commitSHA).Scan(&exists)
+	err := r.db.QueryRowContext(ctx, query, repoID, commitSHA).Scan(&exists)
 	if err != nil {
 		slog.Error("Database error checking subcommits for commit", "repo_id", repoID, "commit_sha", commitSHA, "error", err)
 	}
 	return exists, err
 }
 
-func (pg *PostgresSubcommitRepository) StoreSubcommits(ctx context.Context, subcommits <-chan subcommit.Subcommit) error {
+func (r *SubcommitRepository) StoreSubcommits(ctx context.Context, subcommits <-chan subcommit.Subcommit) error {
 	const query = `
 		INSERT INTO subcommit (title, idea, description, epic, modification_type, commit_sha, files, repo_id, committed_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
 	var count int
 	for sc := range subcommits {
-		_, err := pg.db.ExecContext(ctx, query,
+		_, err := r.db.ExecContext(ctx, query,
 			sc.Title(), sc.Idea(), sc.Description(), sc.Epic(), sc.ModificationType(), sc.CommitSHA(),
 			pq.Array(sc.Files()), sc.RepoID(), sc.CommittedAt())
 		if err != nil {

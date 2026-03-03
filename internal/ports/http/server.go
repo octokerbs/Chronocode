@@ -6,7 +6,6 @@ import (
 
 	"github.com/octokerbs/chronocode/internal/application"
 	"github.com/octokerbs/chronocode/internal/ports/http/auth"
-	"github.com/octokerbs/chronocode/internal/ports/http/service"
 	"github.com/octokerbs/chronocode/internal/ports/http/utils"
 	"golang.org/x/oauth2"
 )
@@ -14,11 +13,8 @@ import (
 func NewServer(application application.Application, oauthConfig *oauth2.Config, frontendURL string, port string) *http.Server {
 	mux := http.NewServeMux()
 
-	authHandler := auth.NewAuthHandler(oauthConfig, frontendURL)
-	userHandler := service.NewUserHandler(application)
-	analyzeHandler := service.NewAnalyzeHandler(application)
-	subcommitsHandler := service.NewSubcommitsHandler(application)
-	reposHandler := service.NewReposHandler(application)
+	authHandler := auth.NewHandler(oauthConfig, frontendURL)
+	applicationHandler := NewApplicationHandler(application)
 
 	// Public routes
 	mux.HandleFunc("GET /auth/status", authHandler.Status)
@@ -28,11 +24,11 @@ func NewServer(application application.Application, oauthConfig *oauth2.Config, 
 
 	// Protected routes
 	protected := http.NewServeMux()
-	protected.HandleFunc("GET /user/profile", userHandler.Profile)
-	protected.HandleFunc("GET /user/repos/search", userHandler.SearchRepos)
-	protected.HandleFunc("GET /repositories", reposHandler.List)
-	protected.HandleFunc("POST /analyze", analyzeHandler.Analyze)
-	protected.HandleFunc("GET /subcommits-timeline", subcommitsHandler.GetTimeline)
+	protected.HandleFunc("GET /user/profile", applicationHandler.GetUserProfileQuery)
+	protected.HandleFunc("GET /user/repos/search", applicationHandler.SearchReposQuery)
+	protected.HandleFunc("GET /repositories", applicationHandler.GetReposQuery)
+	protected.HandleFunc("POST /analyze", applicationHandler.AnalyzeRepoCommand)
+	protected.HandleFunc("GET /subcommits-timeline", applicationHandler.GetSubcommitsQuery)
 
 	mux.Handle("/", utils.AuthMiddleware(protected))
 

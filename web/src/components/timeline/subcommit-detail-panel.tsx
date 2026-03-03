@@ -35,7 +35,7 @@ export function SubcommitDetailPanel({
 
   return (
     <Sheet open={!!subcommit} onOpenChange={() => onClose()}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+      <SheetContent className="w-full overflow-y-auto px-6 py-6 sm:max-w-lg">
         <SheetHeader>
           <div className="flex items-center gap-2">
             <TypeBadge type={subcommit.type} size="md" />

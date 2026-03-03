@@ -5,9 +5,10 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
+COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 
-RUN go build -o main ./internal/main.go
+RUN go build -o main ./cmd/main.go
 
 EXPOSE 8080
 

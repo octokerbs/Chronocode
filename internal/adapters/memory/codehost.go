@@ -1,4 +1,4 @@
-package adapters
+package memory
 
 import (
 	"context"
@@ -11,28 +11,28 @@ import (
 )
 
 var (
-	ValidRepoURL        = "https/validRepo"
-	ValidRepoID   int64 = 123456789
-	ValidRepoCommitSHA  = "CommitSHA-1"
-	ValidRepoCommitDate = time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
+	ValidRepoURL              = "https/validRepo"
+	ValidRepoID         int64 = 123456789
+	ValidRepoCommitSHA        = "CommitSHA-1"
+	ValidRepoCommitDate       = time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
 
 	ValidRepoCommitSHA2  = "CommitSHA-2"
 	ValidRepoCommitDate2 = time.Date(2025, 1, 10, 10, 0, 0, 0, time.UTC)
 
-	ValidEmptyRepoURL      = "https/emptyRepo"
-	ValidEmptyRepoID int64 = 9876543221
+	ValidEmptyRepoURL       = "https/emptyRepo"
+	ValidEmptyRepoID  int64 = 9876543221
 
 	InvalidRepoURL         = "https/invalidRepo"
 	ForbiddenRepoURL       = "https/forbiddenRepo"
 	ForbiddenRepoID  int64 = 333333333
 
-	FailingAgentRepoURL      = "https/failingAgentRepo"
-	FailingAgentRepoID int64 = 111111111
-	FailingCommitSHA         = "FailingCommitSHA-1"
-	FailingCommitDate        = time.Date(2025, 1, 14, 10, 0, 0, 0, time.UTC)
+	FailingAgentRepoURL       = "https/failingAgentRepo"
+	FailingAgentRepoID  int64 = 111111111
+	FailingCommitSHA          = "FailingCommitSHA-1"
+	FailingCommitDate         = time.Date(2025, 1, 14, 10, 0, 0, 0, time.UTC)
 
-	PartialFailureRepoURL      = "https/partialFailureRepo"
-	PartialFailureRepoID int64 = 222222222
+	PartialFailureRepoURL       = "https/partialFailureRepo"
+	PartialFailureRepoID  int64 = 222222222
 
 	ValidAccessToken   = "valid-token"
 	InvalidAccessToken = "invalid-token"

@@ -155,7 +155,11 @@ func (s *AnalyzeRepoHandler) HandleAsync(ctx context.Context, cmd AnalyzeRepo) (
 	release, err := s.locker.Acquire(ctx, cmd.RepoURL)
 	if err != nil {
 		slog.Warn("Failed to acquire analysis lock - analysis already in progress", "repo_url", cmd.RepoURL)
-		return 0, err
+		existingRepo, lookupErr := s.repoRepository.GetRepo(ctx, cmd.RepoURL)
+		if lookupErr != nil {
+			return 0, err
+		}
+		return existingRepo.ID(), err
 	}
 	slog.Debug("Analysis lock acquired", "repo_url", cmd.RepoURL)
 

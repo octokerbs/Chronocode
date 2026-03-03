@@ -15,10 +15,11 @@ export function DayGroup({ date, subcommits, onCardClick }: DayGroupProps) {
     weekday: "short",
     month: "short",
     day: "numeric",
+    year: "numeric",
   });
 
   return (
-    <div className="flex shrink-0 flex-col gap-3">
+    <div className="flex shrink-0 flex-col gap-3 border-r border-border/40 pr-6 last:border-r-0 last:pr-0">
       <div className="sticky top-0 z-10 bg-background/95 px-1 py-2 backdrop-blur">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {formatted}

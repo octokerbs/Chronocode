@@ -1,4 +1,4 @@
-package adapters
+package memory
 
 import (
 	"context"

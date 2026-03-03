@@ -1,4 +1,4 @@
-package adapters
+package github
 
 import (
 	"context"
@@ -15,13 +15,13 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type GithubCodeHostFactory struct{}
+type CodeHostFactory struct{}
 
-func NewGithubCodeHostFactory() *GithubCodeHostFactory {
-	return &GithubCodeHostFactory{}
+func NewGithubCodeHostFactory() *CodeHostFactory {
+	return &CodeHostFactory{}
 }
 
-func (f *GithubCodeHostFactory) Create(ctx context.Context, accessToken string) (codehost.CodeHost, error) {
+func (f *CodeHostFactory) Create(ctx context.Context, accessToken string) (codehost.CodeHost, error) {
 	if accessToken == "" {
 		slog.Warn("GitHub code host creation failed - empty access token")
 		return nil, codehost.ErrAccessDenied
@@ -32,14 +32,14 @@ func (f *GithubCodeHostFactory) Create(ctx context.Context, accessToken string) 
 	client := github.NewClient(tc)
 
 	slog.Debug("GitHub code host client created")
-	return &GithubCodeHost{client: client}, nil
+	return &CodeHost{client: client}, nil
 }
 
-type GithubCodeHost struct {
+type CodeHost struct {
 	client *github.Client
 }
 
-func (gc *GithubCodeHost) CanAccessRepo(ctx context.Context, repoURL string) error {
+func (ch *CodeHost) CanAccessRepo(ctx context.Context, repoURL string) error {
 	owner, repoName, err := parseRepoURL(repoURL)
 	if err != nil {
 		slog.Warn("Invalid repo URL for access check", "repo_url", repoURL, "error", err)
@@ -47,7 +47,7 @@ func (gc *GithubCodeHost) CanAccessRepo(ctx context.Context, repoURL string) err
 	}
 
 	slog.Debug("Checking GitHub repo access", "owner", owner, "repo", repoName)
-	_, resp, err := gc.client.Repositories.Get(ctx, owner, repoName)
+	_, resp, err := ch.client.Repositories.Get(ctx, owner, repoName)
 	if err != nil {
 		if resp != nil && (resp.StatusCode == 404 || resp.StatusCode == 403 || resp.StatusCode == 401) {
 			slog.Warn("GitHub repo access denied", "owner", owner, "repo", repoName, "status", resp.StatusCode)
@@ -61,14 +61,14 @@ func (gc *GithubCodeHost) CanAccessRepo(ctx context.Context, repoURL string) err
 	return nil
 }
 
-func (gc *GithubCodeHost) CreateRepoFromURL(ctx context.Context, repoURL string) (*repo.Repo, error) {
+func (ch *CodeHost) CreateRepoFromURL(ctx context.Context, repoURL string) (*repo.Repo, error) {
 	owner, repoName, err := parseRepoURL(repoURL)
 	if err != nil {
 		return nil, codehost.ErrInvalidRepoURL
 	}
 
 	slog.Debug("Fetching GitHub repo metadata", "owner", owner, "repo", repoName)
-	ghRepo, _, err := gc.client.Repositories.Get(ctx, owner, repoName)
+	ghRepo, _, err := ch.client.Repositories.Get(ctx, owner, repoName)
 	if err != nil {
 		slog.Error("Failed to fetch GitHub repo metadata", "owner", owner, "repo", repoName, "error", err)
 		return nil, err
@@ -78,9 +78,9 @@ func (gc *GithubCodeHost) CreateRepoFromURL(ctx context.Context, repoURL string)
 	return repo.NewRepo(*ghRepo.ID, *ghRepo.FullName, repoURL, "", time.Now()), nil
 }
 
-func (gc *GithubCodeHost) GetAuthenticatedUser(ctx context.Context) (*codehost.UserProfile, error) {
+func (ch *CodeHost) GetAuthenticatedUser(ctx context.Context) (*codehost.UserProfile, error) {
 	slog.Debug("Fetching authenticated GitHub user")
-	user, _, err := gc.client.Users.Get(ctx, "")
+	user, _, err := ch.client.Users.Get(ctx, "")
 	if err != nil {
 		slog.Error("Failed to fetch authenticated GitHub user", "error", err)
 		return nil, err
@@ -103,14 +103,14 @@ func (gc *GithubCodeHost) GetAuthenticatedUser(ctx context.Context) (*codehost.U
 	return profile, nil
 }
 
-func (gc *GithubCodeHost) SearchRepositories(ctx context.Context, query string) ([]codehost.RepoSearchResult, error) {
+func (ch *CodeHost) SearchRepositories(ctx context.Context, query string) ([]codehost.RepoSearchResult, error) {
 	slog.Debug("Searching GitHub repositories", "query", query)
 	opts := &github.RepositoryListOptions{
 		ListOptions: github.ListOptions{PerPage: 20},
 		Sort:        "updated",
 	}
 
-	repos, _, err := gc.client.Repositories.List(ctx, "", opts)
+	repos, _, err := ch.client.Repositories.List(ctx, "", opts)
 	if err != nil {
 		slog.Error("Failed to list GitHub repositories", "query", query, "error", err)
 		return nil, err
@@ -134,7 +134,7 @@ func (gc *GithubCodeHost) SearchRepositories(ctx context.Context, query string) 
 	return results, nil
 }
 
-func (gc *GithubCodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, r *repo.Repo, commits chan<- codehost.CommitReference) (string, error) {
+func (ch *CodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, r *repo.Repo, commits chan<- codehost.CommitReference) (string, error) {
 	owner, repoName, err := parseRepoURL(r.URL())
 	if err != nil {
 		return "", codehost.ErrInvalidRepoURL
@@ -152,7 +152,7 @@ func (gc *GithubCodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, r *r
 	page := 0
 	for {
 		page++
-		pageCommits, resp, err := gc.client.Repositories.ListCommits(ctx, owner, repoName, opts)
+		pageCommits, resp, err := ch.client.Repositories.ListCommits(ctx, owner, repoName, opts)
 		if err != nil {
 			slog.Error("Failed to fetch commits page from GitHub", "owner", owner, "repo", repoName, "page", page, "error", err)
 			return "", err
@@ -198,7 +198,7 @@ func (gc *GithubCodeHost) GetRepoCommitSHAsIntoChannel(ctx context.Context, r *r
 	return headSHA, nil
 }
 
-func (gc *GithubCodeHost) GetCommitDiff(ctx context.Context, r *repo.Repo, commitSHA string) (string, error) {
+func (ch *CodeHost) GetCommitDiff(ctx context.Context, r *repo.Repo, commitSHA string) (string, error) {
 	owner, repoName, err := parseRepoURL(r.URL())
 	if err != nil {
 		return "", codehost.ErrInvalidRepoURL
@@ -206,7 +206,7 @@ func (gc *GithubCodeHost) GetCommitDiff(ctx context.Context, r *repo.Repo, commi
 
 	slog.Debug("Fetching commit diff", "owner", owner, "repo", repoName, "commit_sha", commitSHA)
 
-	commit, _, err := gc.client.Repositories.GetCommit(ctx, owner, repoName, commitSHA)
+	commit, _, err := ch.client.Repositories.GetCommit(ctx, owner, repoName, commitSHA)
 	if err != nil {
 		slog.Error("Failed to fetch commit diff from GitHub", "owner", owner, "repo", repoName, "commit_sha", commitSHA, "error", err)
 		return "", err

@@ -1,4 +1,4 @@
-package adapters
+package gemini
 
 import (
 	"context"
@@ -10,12 +10,12 @@ import (
 	"github.com/octokerbs/chronocode/internal/domain/agent"
 )
 
-type GeminiAgent struct {
+type Agent struct {
 	client          *genai.Client
 	generativeModel *genai.GenerativeModel
 }
 
-func NewGeminiAgent(client *genai.Client, model string) (*GeminiAgent, error) {
+func NewAgent(client *genai.Client, model string) (*Agent, error) {
 	if client == nil {
 		return nil, errors.New("missing gemini client")
 	}
@@ -28,7 +28,7 @@ func NewGeminiAgent(client *genai.Client, model string) (*GeminiAgent, error) {
 	generativeModel.ResponseMIMEType = "application/json"
 
 	slog.Info("Gemini agent initialized", "model", model)
-	return &GeminiAgent{client: client, generativeModel: generativeModel}, nil
+	return &Agent{client: client, generativeModel: generativeModel}, nil
 }
 
 type subcommitResponse struct {
@@ -44,12 +44,12 @@ type analysisResponse struct {
 	Subcommits []subcommitResponse `json:"subcommits"`
 }
 
-func (ga *GeminiAgent) AnalyzeDiff(ctx context.Context, diff string) ([]agent.AnalysisResult, error) {
+func (a *Agent) AnalyzeDiff(ctx context.Context, diff string) ([]agent.AnalysisResult, error) {
 	slog.Debug("Gemini analyzing diff", "diff_length", len(diff))
 
-	prompt := ga.commitAnalysisPrompt() + diff
+	prompt := a.commitAnalysisPrompt() + diff
 
-	text, err := ga.generateStructuredContent(ctx, prompt, ga.analysisSchema())
+	text, err := a.generateStructuredContent(ctx, prompt, a.analysisSchema())
 	if err != nil {
 		slog.Error("Gemini content generation failed", "error", err, "diff_length", len(diff))
 		return nil, err
@@ -77,13 +77,13 @@ func (ga *GeminiAgent) AnalyzeDiff(ctx context.Context, diff string) ([]agent.An
 	return results, nil
 }
 
-func (ga *GeminiAgent) analysisSchema() *genai.Schema {
+func (a *Agent) analysisSchema() *genai.Schema {
 	return &genai.Schema{
 		Type: genai.TypeObject,
 		Properties: map[string]*genai.Schema{
 			"subcommits": {
 				Type:        genai.TypeArray,
-				Items:       ga.subcommitSchema(),
+				Items:       a.subcommitSchema(),
 				Description: "An array of logical units of work that make up this commit.",
 			},
 		},
@@ -91,7 +91,7 @@ func (ga *GeminiAgent) analysisSchema() *genai.Schema {
 	}
 }
 
-func (ga *GeminiAgent) subcommitSchema() *genai.Schema {
+func (a *Agent) subcommitSchema() *genai.Schema {
 	return &genai.Schema{
 		Type: genai.TypeObject,
 		Properties: map[string]*genai.Schema{
@@ -128,7 +128,7 @@ func (ga *GeminiAgent) subcommitSchema() *genai.Schema {
 	}
 }
 
-func (ga *GeminiAgent) commitAnalysisPrompt() string {
+func (a *Agent) commitAnalysisPrompt() string {
 	return `You are a Commit Expert Analyzer specializing in code analysis and software development patterns.
 You will receive a Git Commit diff.
 Your task is to identify the logical units of work ("SubCommits") within this single commit.
@@ -144,12 +144,12 @@ Now extract the subcommits from the following diff:
 `
 }
 
-func (ga *GeminiAgent) generateStructuredContent(ctx context.Context, prompt string, schema *genai.Schema) ([]byte, error) {
-	ga.generativeModel.ResponseSchema = schema
+func (a *Agent) generateStructuredContent(ctx context.Context, prompt string, schema *genai.Schema) ([]byte, error) {
+	a.generativeModel.ResponseSchema = schema
 
 	slog.Debug("Sending request to Gemini API", "prompt_length", len(prompt))
 
-	resp, err := ga.generativeModel.GenerateContent(ctx, genai.Text(prompt))
+	resp, err := a.generativeModel.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
 		slog.Error("Gemini API request failed", "error", err)
 		return nil, err

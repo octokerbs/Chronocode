@@ -8,7 +8,10 @@ import (
 	"os"
 
 	"github.com/google/generative-ai-go/genai"
-	"github.com/octokerbs/chronocode/internal/adapters"
+	"github.com/octokerbs/chronocode/internal/adapters/gemini"
+	github2 "github.com/octokerbs/chronocode/internal/adapters/github"
+	"github.com/octokerbs/chronocode/internal/adapters/memory"
+	"github.com/octokerbs/chronocode/internal/adapters/postgres"
 	"github.com/octokerbs/chronocode/internal/application"
 	"github.com/octokerbs/chronocode/internal/application/command"
 	"github.com/octokerbs/chronocode/internal/application/query"
@@ -30,7 +33,7 @@ func NewApplication(ctx context.Context) application.Application {
 	}
 	slog.Info("Gemini AI client connected")
 
-	agent, err := adapters.NewGeminiAgent(geminiClient, os.Getenv("GEMINI_GENERATIVE_MODEL"))
+	agent, err := gemini.NewAgent(geminiClient, os.Getenv("GEMINI_GENERATIVE_MODEL"))
 	if err != nil {
 		slog.Error("Failed to create Gemini agent", "error", err)
 		panic(err)
@@ -49,20 +52,20 @@ func NewApplication(ctx context.Context) application.Application {
 	}
 	slog.Info("PostgreSQL connected successfully")
 
-	repoRepository, err := adapters.NewPostgresRepoRepository(postgresClient)
+	repoRepository, err := postgres.NewRepoRepository(postgresClient)
 	if err != nil {
 		slog.Error("Failed to create repo repository", "error", err)
 		panic(err)
 	}
 
-	subcommitRepository, err := adapters.NewPostgresSubcommitRepository(postgresClient)
+	subcommitRepository, err := postgres.NewPostgresSubcommitRepository(postgresClient)
 	if err != nil {
 		slog.Error("Failed to create subcommit repository", "error", err)
 		panic(err)
 	}
 
-	codeHostFactory := adapters.NewGithubCodeHostFactory()
-	locker := adapters.NewInMemoryLocker()
+	codeHostFactory := github2.NewGithubCodeHostFactory()
+	locker := memory.NewInMemoryLocker()
 
 	slog.Info("All dependencies initialized successfully")
 

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/octokerbs/chronocode/internal/adapters"
+	"github.com/octokerbs/chronocode/internal/adapters/memory"
 	"github.com/octokerbs/chronocode/internal/domain/agent"
 	"github.com/octokerbs/chronocode/internal/domain/analysis"
 	"github.com/octokerbs/chronocode/internal/domain/codehost"
@@ -31,125 +31,125 @@ func TestAnalyzeRepositoryTestSuite(t *testing.T) {
 }
 
 func (s *AnalyzeRepositoryTestSuite) SetupTest() {
-	s.repoRepository = adapters.NewRepoRepository()
-	s.subcommitRepository = adapters.NewSubcommitRepository()
-	s.agent = adapters.NewAgent()
-	s.codeHostFactory = adapters.NewCodeHostFactory()
-	s.locker = adapters.NewInMemoryLocker()
+	s.repoRepository = memory.NewRepoRepository()
+	s.subcommitRepository = memory.NewSubcommitRepository()
+	s.agent = memory.NewAgent()
+	s.codeHostFactory = memory.NewCodeHostFactory()
+	s.locker = memory.NewInMemoryLocker()
 	s.handler = NewAnalyzeRepoHandler(s.repoRepository, s.subcommitRepository, s.agent, s.codeHostFactory, s.locker)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestCannotAnalyzeWithoutAccessToken() {
-	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, ""})
+	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, ""})
 	assert.NotNil(s.T(), err)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestCannotAnalyzeInaccessibleRepo() {
-	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ForbiddenRepoURL, adapters.ValidAccessToken})
+	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{memory.ForbiddenRepoURL, memory.ValidAccessToken})
 	assert.True(s.T(), errors.Is(err, codehost.ErrAccessDenied))
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestCannotAnalyzeWithInvalidURL() {
-	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{adapters.InvalidRepoURL, adapters.ValidAccessToken})
+	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{memory.InvalidRepoURL, memory.ValidAccessToken})
 	assert.True(s.T(), errors.Is(err, codehost.ErrInvalidRepoURL))
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestAnalyzesValidRepoSuccessfully() {
-	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
+	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
 	assert.Nil(s.T(), err)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestStoresNewRepositoryAfterAnalysis() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
-	_, err := s.repoRepository.GetRepo(context.Background(), adapters.ValidRepoURL)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
+	_, err := s.repoRepository.GetRepo(context.Background(), memory.ValidRepoURL)
 	assert.Nil(s.T(), err)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestNewRepoHasSubcommitsAfterAnalysis() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
-	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
+	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), memory.ValidRepoID)
 
 	assert.Nil(s.T(), err)
 	assert.NotEmpty(s.T(), subcommits)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestNewRepoWithoutCommitsHasNoSubcommits() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidEmptyRepoURL, adapters.ValidAccessToken})
-	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidEmptyRepoID)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidEmptyRepoURL, memory.ValidAccessToken})
+	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), memory.ValidEmptyRepoID)
 
 	assert.Nil(s.T(), err)
 	assert.Empty(s.T(), subcommits)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestExistingRepositoryMayHaveOutdatedSubcommits() {
-	_ = s.repoRepository.StoreRepo(context.Background(), repo.NewRepo(adapters.ValidRepoID, "chronocode", adapters.ValidRepoURL, "old-sha", time.Time{}))
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
-	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
+	_ = s.repoRepository.StoreRepo(context.Background(), repo.NewRepo(memory.ValidRepoID, "chronocode", memory.ValidRepoURL, "old-sha", time.Time{}))
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
+	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), memory.ValidRepoID)
 
 	assert.Nil(s.T(), err)
 	assert.NotEmpty(s.T(), subcommits)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestReanalysisSkipsAlreadyAnalyzedCommits() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
-	subcommitsBefore, _ := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
+	subcommitsBefore, _ := s.subcommitRepository.GetSubcommits(context.Background(), memory.ValidRepoID)
 
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
-	subcommitsAfter, _ := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
+	subcommitsAfter, _ := s.subcommitRepository.GetSubcommits(context.Background(), memory.ValidRepoID)
 
 	assert.Equal(s.T(), len(subcommitsBefore), len(subcommitsAfter))
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestInvalidURLDoesNotStoreRepo() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.InvalidRepoURL, adapters.ValidAccessToken})
-	_, err := s.repoRepository.GetRepo(context.Background(), adapters.InvalidRepoURL)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.InvalidRepoURL, memory.ValidAccessToken})
+	_, err := s.repoRepository.GetRepo(context.Background(), memory.InvalidRepoURL)
 
 	assert.True(s.T(), errors.Is(err, repo.ErrRepositoryNotFound))
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestInvalidURLDoesNotStoreSubcommits() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.InvalidRepoURL, adapters.ValidAccessToken})
-	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.InvalidRepoURL, memory.ValidAccessToken})
+	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), memory.ValidRepoID)
 
 	assert.Nil(s.T(), err)
 	assert.Empty(s.T(), subcommits)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestAnalyzingTwoReposDoesNotMixSubcommits() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidEmptyRepoURL, adapters.ValidAccessToken})
-	subcommits, _ := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidEmptyRepoID)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidEmptyRepoURL, memory.ValidAccessToken})
+	subcommits, _ := s.subcommitRepository.GetSubcommits(context.Background(), memory.ValidEmptyRepoID)
 
 	assert.Empty(s.T(), subcommits)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestSubcommitsBelongToAnalyzedRepo() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
-	subcommits, _ := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
+	subcommits, _ := s.subcommitRepository.GetSubcommits(context.Background(), memory.ValidRepoID)
 
 	for _, sc := range subcommits {
-		assert.Equal(s.T(), adapters.ValidRepoID, sc.RepoID())
+		assert.Equal(s.T(), memory.ValidRepoID, sc.RepoID())
 	}
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestExistingRepoIsNotDuplicatedAfterReAnalysis() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
-	_, err := s.repoRepository.GetRepo(context.Background(), adapters.ValidRepoURL)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
+	_, err := s.repoRepository.GetRepo(context.Background(), memory.ValidRepoURL)
 
 	assert.Nil(s.T(), err)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestEmptyRepoIsStillStored() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidEmptyRepoURL, adapters.ValidAccessToken})
-	_, err := s.repoRepository.GetRepo(context.Background(), adapters.ValidEmptyRepoURL)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidEmptyRepoURL, memory.ValidAccessToken})
+	_, err := s.repoRepository.GetRepo(context.Background(), memory.ValidEmptyRepoURL)
 
 	assert.Nil(s.T(), err)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestEachCommitProducesAtLeastOneSubcommit() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
-	subcommits, _ := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
+	subcommits, _ := s.subcommitRepository.GetSubcommits(context.Background(), memory.ValidRepoID)
 
 	assert.GreaterOrEqual(s.T(), len(subcommits), 1)
 }
@@ -157,20 +157,20 @@ func (s *AnalyzeRepositoryTestSuite) TestEachCommitProducesAtLeastOneSubcommit()
 // Agent failure (all commits fail)
 
 func (s *AnalyzeRepositoryTestSuite) TestAgentFailureReturnsError() {
-	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{adapters.FailingAgentRepoURL, adapters.ValidAccessToken})
+	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{memory.FailingAgentRepoURL, memory.ValidAccessToken})
 	assert.True(s.T(), errors.Is(err, agent.ErrAnalysisFailed))
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestAgentFailureStillStoresRepo() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.FailingAgentRepoURL, adapters.ValidAccessToken})
-	_, err := s.repoRepository.GetRepo(context.Background(), adapters.FailingAgentRepoURL)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.FailingAgentRepoURL, memory.ValidAccessToken})
+	_, err := s.repoRepository.GetRepo(context.Background(), memory.FailingAgentRepoURL)
 
 	assert.Nil(s.T(), err)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestAgentFailureDoesNotStoreSubcommits() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.FailingAgentRepoURL, adapters.ValidAccessToken})
-	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), adapters.FailingAgentRepoID)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.FailingAgentRepoURL, memory.ValidAccessToken})
+	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), memory.FailingAgentRepoID)
 
 	assert.Nil(s.T(), err)
 	assert.Empty(s.T(), subcommits)
@@ -179,31 +179,31 @@ func (s *AnalyzeRepositoryTestSuite) TestAgentFailureDoesNotStoreSubcommits() {
 // Partial failure (some commits succeed, some fail)
 
 func (s *AnalyzeRepositoryTestSuite) TestPartialFailureReturnsError() {
-	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{adapters.PartialFailureRepoURL, adapters.ValidAccessToken})
+	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{memory.PartialFailureRepoURL, memory.ValidAccessToken})
 	assert.True(s.T(), errors.Is(err, agent.ErrAnalysisFailed))
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestPartialFailureStillStoresRepo() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.PartialFailureRepoURL, adapters.ValidAccessToken})
-	_, err := s.repoRepository.GetRepo(context.Background(), adapters.PartialFailureRepoURL)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.PartialFailureRepoURL, memory.ValidAccessToken})
+	_, err := s.repoRepository.GetRepo(context.Background(), memory.PartialFailureRepoURL)
 
 	assert.Nil(s.T(), err)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestPartialFailureStoresSuccessfulSubcommits() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.PartialFailureRepoURL, adapters.ValidAccessToken})
-	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), adapters.PartialFailureRepoID)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.PartialFailureRepoURL, memory.ValidAccessToken})
+	subcommits, err := s.subcommitRepository.GetSubcommits(context.Background(), memory.PartialFailureRepoID)
 
 	assert.Nil(s.T(), err)
 	assert.NotEmpty(s.T(), subcommits)
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestRetryAfterPartialFailureSkipsSuccessfulCommits() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.PartialFailureRepoURL, adapters.ValidAccessToken})
-	subcommitsBefore, _ := s.subcommitRepository.GetSubcommits(context.Background(), adapters.PartialFailureRepoID)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.PartialFailureRepoURL, memory.ValidAccessToken})
+	subcommitsBefore, _ := s.subcommitRepository.GetSubcommits(context.Background(), memory.PartialFailureRepoID)
 
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.PartialFailureRepoURL, adapters.ValidAccessToken})
-	subcommitsAfter, _ := s.subcommitRepository.GetSubcommits(context.Background(), adapters.PartialFailureRepoID)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.PartialFailureRepoURL, memory.ValidAccessToken})
+	subcommitsAfter, _ := s.subcommitRepository.GetSubcommits(context.Background(), memory.PartialFailureRepoID)
 
 	assert.Equal(s.T(), len(subcommitsBefore), len(subcommitsAfter))
 }
@@ -211,15 +211,15 @@ func (s *AnalyzeRepositoryTestSuite) TestRetryAfterPartialFailureSkipsSuccessful
 // Incremental fetch
 
 func (s *AnalyzeRepositoryTestSuite) TestSuccessfulAnalysisUpdatesLastAnalyzedSHA() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
-	r, _ := s.repoRepository.GetRepo(context.Background(), adapters.ValidRepoURL)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
+	r, _ := s.repoRepository.GetRepo(context.Background(), memory.ValidRepoURL)
 
-	assert.Equal(s.T(), adapters.ValidRepoCommitSHA, r.LastAnalyzedCommitSHA())
+	assert.Equal(s.T(), memory.ValidRepoCommitSHA, r.LastAnalyzedCommitSHA())
 }
 
 func (s *AnalyzeRepositoryTestSuite) TestPartialFailureDoesNotUpdateLastAnalyzedSHA() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.PartialFailureRepoURL, adapters.ValidAccessToken})
-	r, _ := s.repoRepository.GetRepo(context.Background(), adapters.PartialFailureRepoURL)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.PartialFailureRepoURL, memory.ValidAccessToken})
+	r, _ := s.repoRepository.GetRepo(context.Background(), memory.PartialFailureRepoURL)
 
 	assert.Equal(s.T(), "", r.LastAnalyzedCommitSHA())
 }
@@ -227,8 +227,8 @@ func (s *AnalyzeRepositoryTestSuite) TestPartialFailureDoesNotUpdateLastAnalyzed
 // Subcommit date
 
 func (s *AnalyzeRepositoryTestSuite) TestSubcommitsHaveCommitDate() {
-	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
-	subcommits, _ := s.subcommitRepository.GetSubcommits(context.Background(), adapters.ValidRepoID)
+	_, _ = s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
+	subcommits, _ := s.subcommitRepository.GetSubcommits(context.Background(), memory.ValidRepoID)
 
 	for _, sc := range subcommits {
 		assert.False(s.T(), sc.CommittedAt().IsZero())
@@ -238,9 +238,9 @@ func (s *AnalyzeRepositoryTestSuite) TestSubcommitsHaveCommitDate() {
 // Repo-level lock
 
 func (s *AnalyzeRepositoryTestSuite) TestConcurrentAnalysisOfSameRepoReturnsError() {
-	release, _ := s.locker.Acquire(context.Background(), adapters.ValidRepoURL)
+	release, _ := s.locker.Acquire(context.Background(), memory.ValidRepoURL)
 	defer release()
 
-	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{adapters.ValidRepoURL, adapters.ValidAccessToken})
+	_, err := s.handler.Handle(context.Background(), AnalyzeRepo{memory.ValidRepoURL, memory.ValidAccessToken})
 	assert.True(s.T(), errors.Is(err, analysis.ErrAnalysisInProgress))
 }

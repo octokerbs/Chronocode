@@ -5,7 +5,7 @@ export function useSubcommits(repoId: string | null) {
   const { data, error, isLoading, mutate } = useSWR(
     repoId ? `/subcommits-timeline/${repoId}` : null,
     () => api.getSubcommitsTimeline(repoId!),
-    { refreshInterval: 5000 },
+    { refreshInterval: (latestData) => latestData?.isAnalyzing ? 3000 : 0 },
   );
 
   return {

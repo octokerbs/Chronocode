@@ -1,4 +1,4 @@
-package adapters
+package postgres
 
 import (
 	"context"
@@ -10,19 +10,19 @@ import (
 	"github.com/octokerbs/chronocode/internal/domain/repo"
 )
 
-type PostgresRepoRepository struct {
+type RepoRepository struct {
 	db *sql.DB
 }
 
-func NewPostgresRepoRepository(db *sql.DB) (*PostgresRepoRepository, error) {
+func NewRepoRepository(db *sql.DB) (*RepoRepository, error) {
 	if db == nil {
 		return nil, errors.New("missing postgres client")
 	}
 
-	return &PostgresRepoRepository{db: db}, nil
+	return &RepoRepository{db: db}, nil
 }
 
-func (pg *PostgresRepoRepository) GetRepo(ctx context.Context, url string) (*repo.Repo, error) {
+func (r *RepoRepository) GetRepo(ctx context.Context, url string) (*repo.Repo, error) {
 	const query = `SELECT id, name, url, last_analyzed_commit_sha, created_at FROM repository WHERE url = $1`
 
 	slog.Debug("Querying repository by URL", "url", url)
@@ -30,7 +30,7 @@ func (pg *PostgresRepoRepository) GetRepo(ctx context.Context, url string) (*rep
 	var id int64
 	var name, repoURL, lastSHA string
 	var createdAt time.Time
-	err := pg.db.QueryRowContext(ctx, query, url).Scan(&id, &name, &repoURL, &lastSHA, &createdAt)
+	err := r.db.QueryRowContext(ctx, query, url).Scan(&id, &name, &repoURL, &lastSHA, &createdAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			slog.Debug("Repository not found by URL", "url", url)
@@ -44,7 +44,7 @@ func (pg *PostgresRepoRepository) GetRepo(ctx context.Context, url string) (*rep
 	return repo.NewRepo(id, name, repoURL, lastSHA, createdAt), nil
 }
 
-func (pg *PostgresRepoRepository) GetRepoByID(ctx context.Context, id int64) (*repo.Repo, error) {
+func (r *RepoRepository) GetRepoByID(ctx context.Context, id int64) (*repo.Repo, error) {
 	const query = `SELECT id, name, url, last_analyzed_commit_sha, created_at FROM repository WHERE id = $1`
 
 	slog.Debug("Querying repository by ID", "repo_id", id)
@@ -52,7 +52,7 @@ func (pg *PostgresRepoRepository) GetRepoByID(ctx context.Context, id int64) (*r
 	var repoID int64
 	var name, repoURL, lastSHA string
 	var createdAt time.Time
-	err := pg.db.QueryRowContext(ctx, query, id).Scan(&repoID, &name, &repoURL, &lastSHA, &createdAt)
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&repoID, &name, &repoURL, &lastSHA, &createdAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			slog.Debug("Repository not found by ID", "repo_id", id)
@@ -66,12 +66,12 @@ func (pg *PostgresRepoRepository) GetRepoByID(ctx context.Context, id int64) (*r
 	return repo.NewRepo(repoID, name, repoURL, lastSHA, createdAt), nil
 }
 
-func (pg *PostgresRepoRepository) ListRepos(ctx context.Context) ([]*repo.Repo, error) {
+func (r *RepoRepository) ListRepos(ctx context.Context) ([]*repo.Repo, error) {
 	const query = `SELECT id, name, url, last_analyzed_commit_sha, created_at FROM repository ORDER BY created_at DESC`
 
 	slog.Debug("Listing all repositories from database")
 
-	rows, err := pg.db.QueryContext(ctx, query)
+	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		slog.Error("Database error listing repositories", "error", err)
 		return nil, err
@@ -94,7 +94,7 @@ func (pg *PostgresRepoRepository) ListRepos(ctx context.Context) ([]*repo.Repo, 
 	return repos, rows.Err()
 }
 
-func (pg *PostgresRepoRepository) StoreRepo(ctx context.Context, r *repo.Repo) error {
+func (r *RepoRepository) StoreRepo(ctx context.Context, repo *repo.Repo) error {
 	const query = `
 		INSERT INTO repository (id, name, url, last_analyzed_commit_sha, created_at)
 		VALUES ($1, $2, $3, $4, $5)
@@ -103,14 +103,14 @@ func (pg *PostgresRepoRepository) StoreRepo(ctx context.Context, r *repo.Repo) e
 			url = EXCLUDED.url,
 			last_analyzed_commit_sha = EXCLUDED.last_analyzed_commit_sha`
 
-	slog.Debug("Storing repository", "repo_id", r.ID(), "name", r.Name(), "url", r.URL(), "last_sha", r.LastAnalyzedCommitSHA())
+	slog.Debug("Storing repository", "repo_id", repo.ID(), "name", repo.Name(), "url", repo.URL(), "last_sha", repo.LastAnalyzedCommitSHA())
 
-	_, err := pg.db.ExecContext(ctx, query, r.ID(), r.Name(), r.URL(), r.LastAnalyzedCommitSHA(), r.CreatedAt())
+	_, err := r.db.ExecContext(ctx, query, repo.ID(), repo.Name(), repo.URL(), repo.LastAnalyzedCommitSHA(), repo.CreatedAt())
 	if err != nil {
-		slog.Error("Database error storing repository", "repo_id", r.ID(), "error", err)
+		slog.Error("Database error storing repository", "repo_id", repo.ID(), "error", err)
 		return err
 	}
 
-	slog.Info("Repository stored", "repo_id", r.ID(), "name", r.Name())
+	slog.Info("Repository stored", "repo_id", repo.ID(), "name", repo.Name())
 	return nil
 }

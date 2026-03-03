@@ -28,6 +28,19 @@ function groupByDay(subcommits: Subcommit[]): Map<string, Subcommit[]> {
   return new Map([...groups.entries()].sort().reverse());
 }
 
+function repoNameFromUrl(url?: string): string {
+  if (!url) return "";
+  try {
+    const parts = new URL(url).pathname.split("/").filter(Boolean);
+    if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
+  } catch {
+    // fallback: try splitting raw string
+    const segments = url.split("/").filter(Boolean);
+    if (segments.length >= 2) return `${segments[segments.length - 2]}/${segments[segments.length - 1]}`;
+  }
+  return url;
+}
+
 export function TimelineContainer({
   subcommits,
   isLoading,
@@ -46,10 +59,26 @@ export function TimelineContainer({
     ]),
   );
   const [searchQuery, setSearchQuery] = useState("");
-  const [epicGrouping, setEpicGrouping] = useState(false);
+  const [activeEpics, setActiveEpics] = useState<Set<string> | null>(null);
   const [selectedSubcommit, setSelectedSubcommit] = useState<Subcommit | null>(
     null,
   );
+
+  const repoName = useMemo(() => repoNameFromUrl(repoUrl), [repoUrl]);
+
+  const allEpics = useMemo(() => {
+    const epics = new Set<string>();
+    for (const sc of subcommits) {
+      if (sc.epic) epics.add(sc.epic);
+    }
+    return [...epics].sort();
+  }, [subcommits]);
+
+  // Initialize activeEpics to all epics on first data load
+  const resolvedActiveEpics = useMemo(() => {
+    if (activeEpics !== null) return activeEpics;
+    return new Set(allEpics);
+  }, [activeEpics, allEpics]);
 
   function toggleType(type: SubcommitType) {
     setActiveTypes((prev) => {
@@ -63,9 +92,23 @@ export function TimelineContainer({
     });
   }
 
+  function toggleEpic(epic: string) {
+    setActiveEpics((prev) => {
+      const current = prev ?? new Set(allEpics);
+      const next = new Set(current);
+      if (next.has(epic)) {
+        next.delete(epic);
+      } else {
+        next.add(epic);
+      }
+      return next;
+    });
+  }
+
   const filtered = useMemo(() => {
     return subcommits.filter((sc) => {
       if (!activeTypes.has(sc.type)) return false;
+      if (sc.epic && !resolvedActiveEpics.has(sc.epic)) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const matchesTitle = sc.title?.toLowerCase().includes(q);
@@ -75,7 +118,7 @@ export function TimelineContainer({
       }
       return true;
     });
-  }, [subcommits, activeTypes, searchQuery]);
+  }, [subcommits, activeTypes, resolvedActiveEpics, searchQuery]);
 
   const groups = useMemo(() => groupByDay(filtered), [filtered]);
 
@@ -88,16 +131,22 @@ export function TimelineContainer({
     );
   }, [subcommits, selectedSubcommit]);
 
+  const filterBarProps = {
+    repoName,
+    activeTypes,
+    onToggleType: toggleType,
+    epics: allEpics,
+    activeEpics: resolvedActiveEpics,
+    onToggleEpic: toggleEpic,
+    searchQuery,
+    onSearchChange: setSearchQuery,
+  };
+
   if (isLoading && subcommits.length === 0) {
     return (
       <>
         <FilterBar
-          activeTypes={activeTypes}
-          onToggleType={toggleType}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          epicGrouping={epicGrouping}
-          onToggleEpicGrouping={() => setEpicGrouping(!epicGrouping)}
+          {...filterBarProps}
           resultCount={0}
           totalCount={0}
         />
@@ -117,12 +166,7 @@ export function TimelineContainer({
     return (
       <>
         <FilterBar
-          activeTypes={activeTypes}
-          onToggleType={toggleType}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          epicGrouping={epicGrouping}
-          onToggleEpicGrouping={() => setEpicGrouping(!epicGrouping)}
+          {...filterBarProps}
           resultCount={0}
           totalCount={0}
         />
@@ -151,12 +195,7 @@ export function TimelineContainer({
   return (
     <>
       <FilterBar
-        activeTypes={activeTypes}
-        onToggleType={toggleType}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        epicGrouping={epicGrouping}
-        onToggleEpicGrouping={() => setEpicGrouping(!epicGrouping)}
+        {...filterBarProps}
         resultCount={filtered.length}
         totalCount={subcommits.length}
       />

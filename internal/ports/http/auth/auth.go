@@ -11,23 +11,23 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type AuthHandler struct {
+type Handler struct {
 	oauthConfig *oauth2.Config
 	frontendURL string
 }
 
-func NewAuthHandler(oauthConfig *oauth2.Config, frontendURL string) *AuthHandler {
-	return &AuthHandler{oauthConfig: oauthConfig, frontendURL: frontendURL}
+func NewHandler(oauthConfig *oauth2.Config, frontendURL string) *Handler {
+	return &Handler{oauthConfig: oauthConfig, frontendURL: frontendURL}
 }
 
-func (h *AuthHandler) Status(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 	_, err := r.Cookie("access_token")
 	isLoggedIn := err == nil
 	slog.Info("Auth status check", "is_logged_in", isLoggedIn, "remote_addr", r.RemoteAddr)
 	utils.WriteJSON(w, http.StatusOK, map[string]bool{"isLoggedIn": isLoggedIn})
 }
 
-func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	state := generateState()
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth_state",
@@ -43,7 +43,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
-func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	stateCookie, err := r.Cookie("oauth_state")
 	if err != nil || stateCookie.Value != r.URL.Query().Get("state") {
 		slog.Warn("OAuth callback failed - invalid state parameter", "has_cookie", err == nil, "remote_addr", r.RemoteAddr)
@@ -82,7 +82,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, h.frontendURL+"/home", http.StatusTemporaryRedirect)
 }
 
-func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:   "access_token",
 		Value:  "",
